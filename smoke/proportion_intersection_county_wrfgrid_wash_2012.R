@@ -21,7 +21,8 @@ summary(smoke_grid) # has 1107 here
 plot(smoke_grid) # check out the grid
 
 # US county shapefile
-us_dir <- paste0('./washington/smoke/us_census_shapes/tl_2012_us_county')
+us_dir <- paste0('C:/Users/RGan/Google Drive/CSU/wildfire/us_census_shapes/',
+  'tl_2012_us_county')
 
 us_county_2012 <- readOGR(dsn = us_dir, layer = 'tl_2012_us_county')
 summary(us_county_2012)
@@ -43,7 +44,21 @@ plot(wa_county_2012, add=T)
 # output washington county names to a dataframe
 wa_county <- data.frame(wa_county_2012@data$NAME) 
 wa_county_name <- as.character(wa_county[, 1])
-length(wa_county_name) # check length, should be 39 counties
+
+# washington county fips codes
+wa_fps <- data.frame(wa_county_2012@data$COUNTYFP)
+wa_county_fps <- as.character(wa_fps[,1])
+
+# Bind county names with fps codes and output as a csv to merge in with county
+# estimates of PM2.5. Rish needs the FPS codes.
+washington_counties <- data.frame(cbind(wa_county_name, wa_county_fps))
+
+# write washington_counties file 
+write_path <- paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
+                     "wildfire_washington/smoke/pm_data/wa_county.csv")
+
+write_csv(washington_counties, write_path)
+
 
 wrf_grid_name <- as.character(smoke_grid@data$WRFGRID_ID)
 length(wrf_grid_name) # 1107 grid ids
