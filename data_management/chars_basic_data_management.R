@@ -15,10 +15,7 @@
 # NOTE for 8/16/16: Merged in PATIENTID based on SEQ_NO_ENC and STAYTYPE
 
 # libraries used ---------------------------------------------------------------
-library(haven) # use haven package, more efficient for big SAS files
-library(dplyr)
-library(tidyr)
-library(readr)
+library(tidyverse)
 
 # setting working directories and importing datasets ---------------------------
 # set working directory to smoke data

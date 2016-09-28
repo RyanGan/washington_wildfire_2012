@@ -5,9 +5,8 @@
 #-------------------------------------------------------------------------------
 
 # Load Libraries ---------------------------------------------------------------
-library(dplyr)
-library(tidyr)
-library(readr)
+library(tidyverse)
+
 
 # Read in permanent CHARs dataset ----------------------------------------------
 path <- paste0('C:/Users/RGan/Documents/CSU/Wild Fire/Washington St CHARS Data/',
