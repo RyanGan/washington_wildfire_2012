@@ -12,17 +12,14 @@
 #              need to be submitted in batches
 
 # load libraries ---------------------------------------------------------------
-library(dplyr) # data manipulation package 
-library(tidyr)
-library(readr)
-
+library(tidyverse)
 
 # Setting Working Directory ----------------------------------------------------
 #dir <- paste0("C:/Users/RGan/Google Drive/CSU/wild_fire/washington/",
 #               "smoke_data/created_pm_estimates")
 
 # relative path 
-dir <- paste0("./washington/smoke")
+dir <- paste0("./smoke/pm_data")
 setwd(dir)
 getwd()
 list.files()
@@ -259,10 +256,9 @@ head(county_pm_conc)
 matrix_name <- paste(data_frame_name, 'df', sep = '_')
 assign(matrix_name, county_pm_conc)
 
-# write permanent dataset
-write_path <- paste('./county_population_weighted_pm/', matrix_name, '.csv', sep = '')
-write.csv(matrix_name, file = write_path)
-
+# commented out the code chunks that write permanent datasets of each dataframe
+#write_path <- paste('./county_population_weighted_pm/', matrix_name, '.csv', sep = '')
+#write.csv(matrix_name, file = write_path)
 
 } # end loop
 
@@ -321,6 +317,8 @@ for(k in 1:length(tidy_loop)){
 
 summary(wash_county_pm_pop_wt_2012) 
 head(wash_county_pm_pop_wt_2012)
+
+# I need the County FIPS codes; joining with dataset
 
 df_check <- wash_county_pm_pop_wt_2012 %>% 
   filter(county == 'Chelan' & date == '2012-09-21')
