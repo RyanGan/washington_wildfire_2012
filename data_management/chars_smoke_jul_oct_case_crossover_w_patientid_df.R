@@ -135,8 +135,7 @@ var_list <- c('resp1', 'asthma1', 'copd_ex1', 'copd1', 'pneum1', 'acute_bronch1'
 
 start <- Sys.time()
 for(j in var_list){ # begin first loop of variable names (outcomes)
-# test
-  j <- 'asthma1'
+
 
 # Outcome-specific dataframe loop ----------------------------------------------
   # prepares the dataframe for creation of case-crossover df
