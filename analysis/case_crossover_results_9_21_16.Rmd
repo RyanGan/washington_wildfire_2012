@@ -7,12 +7,9 @@ output: html_document
 
 ```{r setup, include=FALSE}
 # loading libraries used
-library(readr) # for importing csv files
-library(dplyr)
+library(tidyverse) # import tidyverse
 library(survival) # for conditional logistic regression
-library(ggplot2) # graphics
 library(htmlTable) # table
-library(tibble) # dataframe stuff (add rows)
 
 ```
 
