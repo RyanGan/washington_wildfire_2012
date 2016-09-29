@@ -17,6 +17,24 @@ wash_ts_df <- read_csv(path)
 
 # check descriptives
 summary(wash_ts_df)
+# missing values in sparsely populated counties. set to 0
+
+check_missing <- filter(wash_ts_df, is.na(n_obs))
+
+# mutate each to fill in missing values
+check2 <- check_missing %>% mutate_each(funs(new = ifelse(is.na(.), 0, .)), n_obs:ra_n)
+
+# aggregated outcome trends; first group by date
+wash_aggregate_df <- wash_ts_df %>% 
+  mutate_each(funs(wo_miss = ifelse(is.na(.), 0, .)), n_obs:ra_n) %>% 
+  group_by(date) %>% 
+  summarise(n_resp = sum(resp_n_wo_miss), n_asthma = sum(asthma_n), n_cvd = sum(cvd_n))
+            avg_wrf_smk = mean(wrf_smk_pm), avg_geo_smk = mean(geo_smk_pm))
+
+summary(wash_aggregate_df)
+
+
+
 
 # asthma trend over time
 asthma_trend_plot <- ggplot(wash_ts_df, aes(x = date, y = asthma_n)) + 
