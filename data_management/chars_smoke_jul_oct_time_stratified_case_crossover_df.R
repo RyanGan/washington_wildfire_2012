@@ -1,17 +1,20 @@
 # ------------------------------------------------------------------------------
-# Title: Join of smoke data and CHARS data for 2012 
-#        and data management/ dataframe creation
+# Title: Case-crossover dataframe creation (only patients with single obs)
+#        and joining with county- and zip-level PM2.5 values. 
 # Author: Ryan Gan
 # Date Created: 6/29/2016   Date Modified: 10/3/16               
 # ------------------------------------------------------------------------------
 
+# Notes ----
 # Notes 8/16/16: I updated smoke data with population weighted averages for zip
 # This code also assumed only one visit, so I remove the people with multiple
 # admissions for the outcome
+
 # Notes 10/3/16: I'm retaining the county assignment of the observation so I
 # can join the county population weighted averages as well for comparison
 # and to analyze morbidity similar to Rish
 
+# Libraries ----
 # load libraries
 library(tidyverse)
 library(lubridate) # working with date
