@@ -1,0 +1,315 @@
+---
+title: 'Washington: County-Level Wildfire Smoke and Health Outcomes'
+author: "Ryan_Gan"
+date: "October 3, 2016"
+output: html_document
+---
+
+## Overview
+
+This document contains county-level resultsfor the association between wildfire smoke PM~2.5~ and cardiovascular (CVD) and respiratory health outcomes. These results will be paired with Rish's county-level mortality analyses for a third manuscript. Herein, I compare different PM~2.5~ estimation methods described in further detail below, as well as contrasting results where county of residence is used to assign population-weighted PM~2.5~ estimates to results where zipcode is used to assign population-weighted PM~2.5~.
+
+```{r setup, include=FALSE}
+# loading libraries used
+library(tidyverse) # import tidyverse
+library(survival) # for conditional logistic regression
+library(htmlTable) # table
+library(rmeta) # for meta analysis
+library(lme4) # random-effects model
+library(broom) # broom for tidy data from stats models
+```
+
+```{r casecross data import, include = F, echo = FALSE}
+# Set working directory and read in files --------------------------------------
+# Direct path 
+path <- paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
+               "wildfire_washington/analysis/analysis_data")
+
+# Infile case-crossover dataframes that contain both zip and county pop-wt pm2.5
+# resp exacerbations
+resp_casecross <- read_csv(paste(path, "resp1_jul_to_oct_casecross.csv", 
+                                 sep = "/"))
+# asthma
+asthma_casecross <- read_csv(paste(path, "asthma1_jul_to_oct_casecross.csv", 
+                                   sep = "/"))
+# copd 
+copd_casecross <- read_csv(paste(path, "copd1_jul_to_oct_casecross.csv", 
+                                 sep = "/"))
+# copd exacerbations
+copd_ex_casecross <- read_csv(paste(path, "copd_ex1_jul_to_oct_casecross.csv",
+                                    sep="/"))
+# pneum or bronchitis
+pneum_casecross <- read_csv(paste(path, "pneum1_jul_to_oct_casecross.csv",
+                                  sep="/"))
+# acute bronchitis
+acute_bronch_casecross <- read_csv(paste(path, 
+                                   "acute_bronch1_jul_to_oct_casecross.csv",
+                                         sep = "/"))
+# cvd
+cvd_casecross <- read_csv(paste(path, "cvd1_jul_to_oct_casecross.csv",
+                                sep="/"))
+# arrhythmia
+arrhythmia_casecross <- read_csv(paste(path, "arrhythmia1_jul_to_oct_casecross.csv",
+                                 sep="/"))
+# cerebral vascular
+cereb_vas_casecross <- read_csv(paste(path, "cereb_vas1_jul_to_oct_casecross.csv",
+                                sep="/"))
+# heart failure
+hf_casecross <- read_csv(paste(path, "hf1_jul_to_oct_casecross.csv", 
+                               sep="/"))
+# ischemic heart disease
+ihd_casecross <- read_csv(paste(path, "ihd1_jul_to_oct_casecross.csv",
+                                sep="/"))
+# myo infarc
+mi_casecross <- read_csv(paste(path, "mi1_jul_to_oct_casecross.csv", sep="/"))
+# RA
+ra_casecross <- read_csv(paste(path, "ra1_jul_to_oct_casecross.csv", sep="/"))
+# broken arm
+broken_arm_casecross <- read_csv(paste(path, "broken_arm1_jul_to_oct_casecross.csv",
+                                       sep="/"))
+
+# time-serieis dataframe
+wash_ts_df <- read_csv(paste(path, "wa_2012_county_time_series.csv", sep="/"))
+
+```
+
+### Time-Series Results
+
+County-level time-series' are performed then aggregated using a meta-analysis to get an overall estimate of the effect of increase smoke PM~2.5~ on daily counts of outcomes.
+
+```{r time series rando effect, echo = F, results='asis'} 
+
+miss_df <- wash_ts_df %>% filter(is.na(n_obs)) 
+# analysis dataframe
+wash_jul_oct_df <- wash_ts_df %>% 
+  # restricting points
+  filter(date >= "2012-07-01" & date <= "2012-10-31") %>% 
+  # exclude 'Unknown' and 'not_wa_residence'
+  filter(county != "not_wa_residence" & county != "Unknown") %>% 
+  # set missing outcome values to 0 since missing indicates no ER or urgent care 
+  # visits on that date (which is reasonable in sparsely populated counties)
+  mutate_each(funs(wo_miss = ifelse(is.na(.), 0, .)), n_obs:ra_n) %>% 
+  # rescale pm variables to 10 units
+  mutate_each(funs(unit10 = ./10), wrf_pm:krig_smk_pm) %>% 
+  select(1:2, 30:44, 28:29, 47, 52:54) # subset to variables used in analysis
+
+# outcomes to loop through
+outcome_list <- c('All ER or Urgent', 'All Respiratory', 'Asthma', 'COPD', 
+                  'COPD Exacerbation', 'Pneumonia', 'Acute Bronchitis', 
+                  'Cardiovascular Disease', 'Arrhythmia', 'Cerebrovascular Disease', 
+                  'Heart Failure', 'Ischemic Heart Disease', 'Myocardial Infarction',
+                  'Rheumatoid Arthritis', 'Broken Arm')
+
+# find list of county names
+county_names <- c("Adams", "Asotin", "Benton", "Chelan", "Clallam", "Clark", 
+                  "Columbia", "Cowlitz", "Douglas", "Ferry", "Franklin", 
+                  "Garfield", "Grant", "Grays Harbor", "Island", "Jefferson", "King",
+                  "Kitsap", "Kittitas", "Klickitat", "Lewis", "Lincoln", "Mason", 
+                  "Okanogan", "Pacific", "Pend Oreille", "Pierce", "San Juan", 
+                  "Skagit", "Skamania", "Snohomish", "Spokane", "Stevens", 
+                  "Thurston", "Wahkiakum", "Walla Walla", "Whatcom", "Whitman", 
+                  "Yakima")
+
+
+# method names to assign
+method_name <- c('WRF-Chem Smoke', 'Geo-Weighted Smoke',  'Global Smoke', 
+                 'Kriging Smoke')
+
+# empty matrix for table
+point_estimates <- matrix(nrow = 4, ncol = 4, byrow = T)
+  
+colnames(point_estimates) <- c('pm_method', 'rate_ratio', 
+                               'lower95', 'upper95')
+
+# find column number
+# which(colnames(wash_jul_oct_df)=='ra_n_wo_miss')  
+
+# loop through outcomes
+for(i in 3:17){
+
+  # variable to model 
+  outcome_name <- outcome_list[i-2]
+
+  # loop through pm estimation methods
+  for(j in 20:23){
+
+  var_name <- method_name[j-19]
+  
+  # random effects model where county is treated as a random intercept 
+  mixed_mod_adj <- glmer(wash_jul_oct_df[[i]] ~ wash_jul_oct_df[[j]] + 
+                         wrf_temp + (1|county), wash_jul_oct_df, family = "poisson")
+  
+  model_df <-tidy(mixed_mod_adj)
+
+  # populate matrix
+  row_n <- j-19
+  # method
+  point_estimates[row_n, 1] <- var_name
+  # rate ratio
+  point_estimates[row_n, 2] <- round(exp(model_df[2,2]), 3)
+  # 95% lower bound
+  point_estimates[row_n, 3] <- round(exp((model_df[2,2]) -
+                                    1.96*(model_df[2,3])), 3)
+  # 95% upper bound
+  point_estimates[row_n, 4] <- round(exp((model_df[2,2]) +
+                                    1.96*(model_df[2,3])), 3)
+
+  }
+
+  # save point estimates as a dataframe
+  point_est_df <- data.frame(point_estimates)
+
+    
+tab <- htmlTable(txtRound(point_est_df, digits = 3, 2:4), 
+        caption = paste("Time-Series: Association between a 10 ug/m^3 in PM2.5 (county population-weighted) and", outcome_name, sep = " "),
+        header = c("Method", "Rate Ratio&dagger;", "Lower", "Upper"),
+        cgroup = c("", "95% CI"), # spanner
+        n.cgroup = c(2, 2),
+        padding.rgroup = "&nbsp;&nbsp;",
+        css.cell = "padding-left: 0.5em; padding-right: .5em;", # cell space
+        align = "lccc", # column alignment,
+        tfoot="&dagger; Adjusted for temperature, accounting for county as a random intercept."
+            ) # end table
+  
+print(tab)
+  
+# model_adj <- glm(asthma_n_wo_miss ~ geo_smk_pm_unit10 + wrf_temp + as.factor(county), wash_jul_oct_df, family=quasipoisson)
+# summary(model_adj)
+}
+
+
+```
+
+### Time-Stratified Case-Crossover Results
+#### Symmetric bi-directional multiple observations, including only 3rd and 4th observations before and after the admission. PM~2.5~ assignment based on county of residence.
+
+In the interest of producing a concise document, I'm only presenting a limited number of scenarios. This is the referent period decision that I think is best based on my zip-code level anayses. 
+
+```{r symmetrical and bi-directional, echo = F, results='asis'} 
+# note above, results = 'asis' needed to print htmlTables
+# Analyses ---------------------------------------------------------------------
+# look up admit type, may want to subset to specifc admit
+# ADM_TYPE variable: 1 = emergency, 2 = urgent, 3 = elective, 4 = newborn
+# 5 = trauma, 9 = info not available
+
+# dataframe list
+df_list <- list(resp_casecross, asthma_casecross, copd_casecross, copd_ex_casecross, 
+  pneum_casecross, acute_bronch_casecross, cvd_casecross, arrhythmia_casecross,
+  cereb_vas_casecross, hf_casecross, ihd_casecross, mi_casecross, 
+  ra_casecross, broken_arm_casecross)
+
+outcome_list <- c('All Respiratory', 'Asthma', 'COPD', 'COPD Exacerbation',
+                  'Pneumonia', 'Acute Bronchitis', 'Cardiovascular Disease',
+                  'Arrhythmia', 'Cerebrovascular Disease', 'Heart Failure',
+                  'Ischemic Heart Disease', 'Myocardial Infarction',
+                  'Rheumatoid Arthritis', 'Broken Arm')
+
+method_list <- c('WRF-Chem Smoke', 'Geo-Weighted Smoke', 
+                 'Global Smoke', 'Kriging Smoke')
+
+
+# Producing conditional logit model estimates loop -----------------------------
+for(i in 1:length(df_list)){
+
+  df_to_loop <- data.frame(df_list[i])
+  outcome <- colnames(df_to_loop[3])
+
+  outcome_name <- outcome_list[i]
+  #glimpse(df_to_loop)
+
+  # find the column numbers for the county-level temp and pbl
+  # which(colnames(df_to_loop)=="day") 
+  # extract covariates from dataframe
+  covariates_df <- df_to_loop[, c(1:16, 94:95, 151:155)]
+  # extract pm values and divide by 10 and ordered
+  # which(colnames(df_to_loop)=="krig_smk_pm_county") # code to find column numbers
+  pm_estimates_df <- df_to_loop[, c(86, 91:93)]/10  # create 10 unit increases
+  # bind columns back together
+  df_analysis <- cbind(covariates_df, pm_estimates_df) %>% 
+    filter(!is.na(wrf_smk_pm_county)) %>% 
+    # limit to emergency or urgent care
+    filter(ADM_TYPE == 1 | ADM_TYPE == 2) %>%
+    # the following code makes sure that the counterfactual values retained are 
+    # symetric in that number of obs before = number of obs after
+    mutate(obs_diff_admission = (date - date_admit)/7) %>% 
+    group_by(PATIENTID) %>% 
+    # identifies the min and max observations, and sets it to the minimum n of obs
+    mutate(min_obs_diff = abs(min(obs_diff_admission)),
+           max_obs_diff = abs(max(obs_diff_admission)),
+           obs_limit = min(c(min_obs_diff, max_obs_diff)),
+           keep_obs = ifelse(abs(obs_diff_admission) <= obs_limit, 1, 0),
+           # excludes the 1st counterfactual observation bf/after admission
+           keep_obs2 = ifelse(obs_diff_admission == 0 | obs_diff_admission == 3 |
+                              obs_diff_admission == -3 | obs_diff_admission == 4 |
+                              obs_diff_admission == -4, 1, 0),
+           # get rid of people with single observations
+           keep_obs3 = ifelse(obs_limit >= 3, 1, 0)) %>% 
+    filter(keep_obs == 1 & keep_obs2 == 1 & keep_obs3 == 1)
+
+  # second loop to run a model for each pm estimation method
+  
+  # empty df for table
+  table_df <- data.frame()
+  
+  # empty matrix
+  point_estimates <- matrix(nrow = 4, ncol = 8, byrow = T)
+  
+  colnames(point_estimates) <- c('pm_method', 'n', 'n_events', 'odds_ratio', 
+                                 'lower95', 'upper95', 'se', 'p_val')
+  #glimpse(df_analysis)
+  
+    for(j in 24:27){
+
+      # variable to model 
+      var_name <- colnames(df_analysis[j])
+
+      # conditional logistic regression model
+      mod <- clogit(outcome ~ df_analysis[[j]] + wrf_temp_county + 
+                    strata(PATIENTID), df_analysis)
+      # might want to consider 'broom' package in the future to make it easier to get 
+      # model estimates.
+
+      # populate matrix
+      row_n <- j-23
+
+      point_estimates[row_n, 1] <- var_name
+      point_estimates[row_n, 2] <- mod$n
+      point_estimates[row_n, 3] <- mod$nevent
+      # odds ratio
+      point_estimates[row_n, 4] <- round(exp(summary(mod)$coefficient[1,1]), 3)
+
+      # 95% lower bound
+      point_estimates[row_n, 5] <- round(exp((summary(mod)$coefficient[1,1]) -
+                                        1.96*(summary(mod)$coefficient[1,3])), 3)
+      # 95% upper bound
+      point_estimates[row_n, 6] <- round(exp((summary(mod)$coefficient[1,1]) +
+                                        1.96*(summary(mod)$coefficient[1,3])), 3)
+      # standard error
+      point_estimates[row_n, 7] <- round(summary(mod)$coefficient[1,3], 4)
+      # p val
+      point_estimates[row_n, 8] <- round(summary(mod)$coefficient[1,5], 4)
+  
+      # save point estimates as a dataframe
+      point_est_df <- data.frame(point_estimates)
+      assign(paste(outcome, "point_est", sep = '_'), point_est_df) 
+    }
+  
+  table_df <- cbind(data.frame(method_list), point_est_df[, 2:6])
+  
+  tab <- htmlTable(txtRound(table_df, digits = 3, 1:3 ), 
+           caption = paste("Association between a 10 ug/m^3 in PM2.5 (county population-weighted) and",
+                           outcome_name, sep = " "),
+           header = c("Method", "Obs.", "Events",
+                      "OR&dagger;", "Lower", "Upper"),
+           cgroup = c("", "95% CI"), # spanner
+           n.cgroup = c(4, 2),
+           padding.rgroup = "&nbsp;&nbsp;",
+           css.cell = "padding-left: 0.5em; padding-right: .5em;", # cell space
+           align = "lccccc", # column alignment,
+           tfoot="&dagger; Adjusted for temperature, accounting for subject. Symmetric bi-direction; including only the 3rd and 4th counterfactual observations."
+            ) # end table
+  
+  print(tab)
+}
+
+```

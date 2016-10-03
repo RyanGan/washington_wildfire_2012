@@ -2,7 +2,7 @@
 # Title: Join of smoke data and CHARS data for 2012 
 #        and data management/ dataframe creation
 # Author: Ryan Gan
-# Date Created: 6/29/2016               
+# Date Created: 6/29/2016               Date Modified: 10/3/2016
 # ------------------------------------------------------------------------------
 
 # load libraries
@@ -33,7 +33,7 @@ smoke_w_lag <- smoke %>% arrange(ZIPCODE, date) %>%
 
 
 # Infile the Permanent Cleaned CHARS 2012 DataFrame ----------------------------
-# Put this file on the atmos server ASAP
+
 read <- paste0('C:/Users/RGan/Documents/CSU/Wild Fire/Washington St CHARS Data/',
                'confidential_data/chars_2012_confidential.csv')
 # read in chars cleaned data
