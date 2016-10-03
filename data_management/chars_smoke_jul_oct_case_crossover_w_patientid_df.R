@@ -8,25 +8,34 @@
 # Notes 8/16/16: I updated smoke data with population weighted averages for zip
 # To do: I need to join the unique identifier to CHARS data
 
+# Notes 10/3/16: I'm retaining the county assignment of the observation so I
+# can join the county population weighted averages as well for comparison
+# and to analyze morbidity similar to Rish. This code still needs work.
+
+# Libraries ----
 # load libraries
-library(dplyr) # data manipulation package (might use plyr instead)
-library(tidyr) # data manipulation package (might not use)
-library(readr) # reads csv
+library(tidyverse)
 library(lubridate) # working with date
 
 
 # Read in smoke data created in loop -------------------------------------------
 getwd()
-read_path <- paste0('C:/Users/RGan/Google Drive/CSU/wildfire/washington/',
-                    'smoke/zip_population_weighted_pm/',
-                    'zip_pm_to_merge_with_chars.csv')
+# read in zipcode level populatoin-weighted pm
+read_path <- paste0('./smoke/pm_data/zip_pm_to_merge_with_chars.csv')
 
-smoke <- read_csv(read_path) 
+zip_smoke <- read_csv(read_path) 
 
-summary(smoke)
-head(smoke)
-# create lag variables that take smoke values from n previous days
-smoke_w_lag <- smoke %>% arrange(ZIPCODE, date) %>%
+# read in county level population-weighted pm
+read_path2 <- paste0('./smoke/pm_data/wa_county_pop_wt_pm.csv')
+
+county_smoke <- read_csv(read_path2)
+# descriptives of the two smoke datasets
+summary(county_smoke)
+summary(zip_smoke)
+
+# Zipcode PM2.5 estimates
+# create lag variables that take smoke values from n previous days for zipcodes
+zip_smoke_w_lag <- zip_smoke %>% arrange(ZIPCODE, date) %>%
   # wrf
   mutate(wrf_pm_lag1 = lag(wrf_pm, 1), 
     wrf_pm_lag2 = lag(wrf_pm, 2),
@@ -92,10 +101,91 @@ smoke_w_lag <- smoke %>% arrange(ZIPCODE, date) %>%
     wrf_temp_lag2 = lag(wrf_temp, 2),
     wrf_temp_lag3 = lag(wrf_temp, 3),
     wrf_temp_lag4 = lag(wrf_temp, 4),
-    wrf_temp_lag5 = lag(wrf_temp, 5))
+    wrf_temp_lag5 = lag(wrf_temp, 5)) %>% 
+  # attach a zip indicator for each smoke variable
+  setNames(paste(colnames(.), "zip", sep="_")) %>% 
+  # remove the '_zip' from the zipcode and date variable 
+  rename(ZIPCODE = ZIPCODE_zip, date = date_zip)
 
 # check 
-summary(smoke_w_lag) # looks good
+summary(zip_smoke_w_lag) # looks good
+
+# County PM2.5 estimates
+# create lag variables that take smoke values from n previous days for county
+county_smoke_w_lag <- county_smoke %>% arrange(county, date) %>%
+  # wrf
+  mutate(wrf_pm_lag1 = lag(wrf_pm, 1), 
+    wrf_pm_lag2 = lag(wrf_pm, 2),
+    wrf_pm_lag3 = lag(wrf_pm, 3),
+    wrf_pm_lag4 = lag(wrf_pm, 4),
+    wrf_pm_lag5 = lag(wrf_pm, 5),
+    # wrf no fire lag
+    wrf_nf_pm_lag1 = lag(wrf_nf_pm, 1),
+    wrf_nf_pm_lag2 = lag(wrf_nf_pm, 2),
+    wrf_nf_pm_lag3 = lag(wrf_nf_pm, 3),
+    wrf_nf_pm_lag4 = lag(wrf_nf_pm, 4),
+    wrf_nf_pm_lag5 = lag(wrf_nf_pm, 5),
+    # wrf_smk_pm
+    wrf_smk_pm_lag1 = lag(wrf_smk_pm, 1),
+    wrf_smk_pm_lag2 = lag(wrf_smk_pm, 2),
+    wrf_smk_pm_lag3 = lag(wrf_smk_pm, 3),
+    wrf_smk_pm_lag4 = lag(wrf_smk_pm, 4),
+    wrf_smk_pm_lag5 = lag(wrf_smk_pm, 5),
+    # geo weighted pm
+    geo_wt_pm_lag1 = lag(geo_wt_pm, 1),
+    geo_wt_pm_lag2 = lag(geo_wt_pm, 2),
+    geo_wt_pm_lag3 = lag(geo_wt_pm, 3),
+    geo_wt_pm_lag4 = lag(geo_wt_pm, 4),
+    geo_wt_pm_lag5 = lag(geo_wt_pm, 5),
+    # global reg pm
+    global_reg_pm_lag1 = lag(global_reg_pm, 1),
+    global_reg_pm_lag2 = lag(global_reg_pm, 2),
+    global_reg_pm_lag3 = lag(global_reg_pm, 3),
+    global_reg_pm_lag4 = lag(global_reg_pm, 4),
+    global_reg_pm_lag5 = lag(global_reg_pm, 5),
+    # krig pm
+    krig_pm_lag1 = lag(krig_pm, 1),
+    krig_pm_lag2 = lag(krig_pm, 2),
+    krig_pm_lag3 = lag(krig_pm, 3),
+    krig_pm_lag4 = lag(krig_pm, 4),
+    krig_pm_lag5 = lag(krig_pm, 5),   
+    # background pm
+    background_pm_lag1 = lag(background_pm, 1),
+    background_pm_lag2 = lag(background_pm, 2),
+    background_pm_lag3 = lag(background_pm, 3),
+    background_pm_lag4 = lag(background_pm, 4),
+    background_pm_lag5 = lag(background_pm, 5),   
+    # geo_smk_pm 
+    geo_smk_pm_lag1 = lag(geo_smk_pm, 1),
+    geo_smk_pm_lag2 = lag(geo_smk_pm, 2),
+    geo_smk_pm_lag3 = lag(geo_smk_pm, 3),
+    geo_smk_pm_lag4 = lag(geo_smk_pm, 4),
+    geo_smk_pm_lag5 = lag(geo_smk_pm, 5),
+    # global smk pm
+    global_smk_pm_lag1 = lag(global_smk_pm, 1),
+    global_smk_pm_lag2 = lag(global_smk_pm, 2),
+    global_smk_pm_lag3 = lag(global_smk_pm, 3),
+    global_smk_pm_lag4 = lag(global_smk_pm, 4),
+    global_smk_pm_lag5 = lag(global_smk_pm, 5),
+    # krig smk pm
+    krig_smk_pm_lag1 = lag(krig_smk_pm, 1),
+    krig_smk_pm_lag2 = lag(krig_smk_pm, 2),
+    krig_smk_pm_lag3 = lag(krig_smk_pm, 3),
+    krig_smk_pm_lag4 = lag(krig_smk_pm, 4),
+    krig_smk_pm_lag5 = lag(krig_smk_pm, 5),
+    # temp
+    wrf_temp_lag1 = lag(wrf_temp, 1),
+    wrf_temp_lag2 = lag(wrf_temp, 2),
+    wrf_temp_lag3 = lag(wrf_temp, 3),
+    wrf_temp_lag4 = lag(wrf_temp, 4),
+    wrf_temp_lag5 = lag(wrf_temp, 5)) %>% 
+  # attach a zip indicator for each smoke variable
+  setNames(paste(colnames(.), "county", sep="_")) %>% 
+  # remove the '_zip' from the zipcode and date variable 
+  rename(county = county_county, date = date_county)
+
+# check 
+summary(county_smoke_w_lag) # looks good
 
 # Infile the Permanent Cleaned CHARS 2012 DataFrame ----------------------------
 # Put this file on the atmos server ASAP
@@ -115,16 +205,51 @@ summary(as.factor(chars_2012_conf_df$ADM_TYPE))
 summary(chars_2012_conf_df$SEQ_NO_ENC)
 glimpse(chars_2012_conf_df$SEQ_NO_ENC)
 
+# Adding in county names based on the COUNTYRES variable in CHARS data
+# COUNTYRES values can be found in the CHARS data key
+# Join CHARS data with names of Washington counties 
+
+## NOTE 10/3/16: I should actually join these county names in the code cleaning
+# and creating variables for the CHARS dataset
+
+# Create two vectors for CHARS county code to bind in with CHARS data
+COUNTYRES <- c("00", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10",
+               "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21",
+               "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32",
+               "33", "34", "35", "36", "37", "38", "39", "99")
+
+county <- c("not_wa_residence", "Adams", "Asotin", "Benton", "Chelan", 
+            "Clallam", "Clark", "Columbia", "Cowlitz", "Douglas", "Ferry", "Franklin",
+            "Garfield", "Grant", "Grays Harbor", "Island", "Jefferson", "King",
+            "Kitsap", "Kittitas", "Klickitat", "Lewis", "Lincoln", "Mason", "Okanogan", 
+            "Pacific", "Pend Oreille", "Pierce", "San Juan", "Skagit", "Skamania",
+            "Snohomish", "Spokane", "Stevens", "Thurston", "Wahkiakum", "Walla Walla",
+            "Whatcom", "Whitman", "Yakima", "Unknown")
+  
+chars_county <- data.frame(cbind(COUNTYRES, county))
+# convert the variables to characters to make merges easier
+chars_county$COUNTYRES <- as.character(chars_county$COUNTYRES)
+chars_county$county <- as.character(chars_county$county)
+
+# join county name in to CHARS data
+# create a working dataset 'chars_2012'
+chars_2012_to_loop <- chars_2012_conf_df %>% 
+  # filter to 2012 dates (prevents parsing failures later on)
+  filter(admit_date_impute >= "2012-01-01" & admit_date_impute <= "2012-12-31") %>% 
+  # join in the washington county name based on CHARS county identifier
+  full_join(chars_county, by = "COUNTYRES")
+
+summary(chars_2012_to_loop)
+
 
 # Case-crossover dataframe creation --------------------------------------------
 
 # set path to write permanent files
-wd_path <- paste0('./washington/case_crossover_dataframes')
-
+wd_path <- paste0('./analysis/analysis_data')
 setwd(wd_path)
+# check working directory
 getwd()
-glimpse(chars_2012_smk)
-glimpse(chars_2012_conf_df)
+glimpse(chars_2012_to_loop)
 
 var_list <- c('resp1', 'asthma1', 'copd_ex1', 'copd1', 'pneum1', 'acute_bronch1',
               'cvd1', 'mi1', 'arrhythmia1', 'cereb_vas1', 'ihd1', 'hf1', 'ra1',
@@ -136,21 +261,19 @@ var_list <- c('resp1', 'asthma1', 'copd_ex1', 'copd1', 'pneum1', 'acute_bronch1'
 start <- Sys.time()
 for(j in var_list){ # begin first loop of variable names (outcomes)
 
-
+  j <- "asthma1"
 # Outcome-specific dataframe loop ----------------------------------------------
   # prepares the dataframe for creation of case-crossover df
-outcome_col <- which(colnames(chars_2012_conf_df) == j) # use to keep outcome var
+outcome_col <- which(colnames(chars_2012_to_loop) == j) # use to keep outcome var
 
-outcome_id <- chars_2012_conf_df %>%
-  filter(chars_2012_conf_df[[j]] == 1) %>% # jth outcome
+outcome_id <- chars_2012_to_loop %>%
+  filter(chars_2012_to_loop[[j]] == 1) %>% # jth outcome
   filter(admit_date_impute >= '2012-07-01' & 
          admit_date_impute <= '2012-10-31') %>% 
   filter(STATERES == 'WA') %>% # limit to washington 
   arrange(PATIENTID, admit_date_impute) %>% 
-  mutate(date_admit = admit_date_impute,
-    date_discharge = DIS_DATE,
-    join_date = date_admit,
-    length_stay = LENSTAYD) %>% 
+  mutate(date_admit = admit_date_impute, date_discharge = DIS_DATE,
+    join_date = date_admit, length_stay = LENSTAYD) %>% 
   # generate a enumerated variable to indicate number of obs by patid
   group_by(PATIENTID) %>% 
   mutate(vis_num = seq_along(PATIENTID),
@@ -169,8 +292,8 @@ outcome_id <- chars_2012_conf_df %>%
   mutate(obs_num = seq(1, nrow(.), by = 1)) %>% # create observation number
   select(obs_num, PATIENTID, vis_num, (outcome_col), # keep in bracket
     STAYTYPE, date_admit, date_discharge, last_admit_date, days_between_admit,
-    next_admit_date, join_date, length_stay, ADM_TYPE, ZIPCODE, moved, AGE, SEX,
-    sex_num, race_nhw, age_cat) 
+    next_admit_date, join_date, length_stay, ADM_TYPE, ZIPCODE, COUNTYRES, county,
+    moved, AGE, SEX, sex_num, race_nhw, age_cat) 
 
 # check person with multiple visits
 patid_1350539_vis <- filter(outcome_id, PATIENTID == 1350539)
@@ -201,9 +324,6 @@ outcome_id_all_vis <- multiple_visits %>% select(-moved) %>% # remove moved var
 
 # check patient 1350539 as they have 6 visits
 
-glimpse(outcome_id_all_vis)
-
-
 # check missing age (why do I have age_cat var not missing?)
 # missing_age <- outcome_id_all_vis %>% filter(is.na(AGE))
 # Ahh, they are all outpatient, so I need to use age_impute. Age cat is correct
@@ -231,8 +351,8 @@ id_date_df <- data_frame()
   for (i in 1:nrow(outcome_id_for_loop)){
    # covariates to preserve
     covariate <- outcome_id_for_loop[i, ] %>% 
-      select(PATIENTID, STAYTYPE, ADM_TYPE,(outcome_col2), ZIPCODE, AGE, 
-             age_cat, SEX, sex_num, race_nhw)
+      select(PATIENTID, STAYTYPE, ADM_TYPE,(outcome_col2), ZIPCODE, COUNTYRES,
+             county, AGE, age_cat, SEX, sex_num, race_nhw)
    
    # replicate covariates length of counterfactual dates
     cov_df <- do.call("bind_rows", replicate(length(date), covariate, 
@@ -255,14 +375,8 @@ for (meow in 1:nrow(outcome_id_all_vis)){
     cov_df <- do.call("bind_rows", replicate(length(date), covariate2, 
                                             simplify = F))  
   }
-
-
-  
-  
 }
 
-
-# START HERE TOMORROW NEEDS WORK -----------------------------------------------
 # join with outcome
 outcome_casecross <- id_date_df %>% 
   left_join(id_vary_vars, by = c("PATIENTID", "date" = "join_date")) %>% 
