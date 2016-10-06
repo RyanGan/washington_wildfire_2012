@@ -9,6 +9,7 @@ library(tidyverse)
 library(splines) # needed to model asthma trend over time
 
 # Load county time series data
+
 path <- paste0("./analysis/analysis_data/wa_2012_county_time_series.csv")
 
 wash_ts_df <- read_csv(path)
