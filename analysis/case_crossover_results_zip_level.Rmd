@@ -1,0 +1,687 @@
+---
+title: "Washington: Wildfire Smoke and Health Outcomes"
+author: "Ryan Gan"
+date: "September 21, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# loading libraries used
+library(tidyverse) # import tidyverse
+library(survival) # for conditional logistic regression
+library(htmlTable) # table
+
+```
+
+## Overview
+
+This document contains updated results for the association between wildfire smoke PM~2.5~ and cardiovascular (CVD) and respiratory health outcomes. Herein, I compare different PM~2.5~ estimation methods described in further detail below. 
+
+Note, epidemiological methods that Sheryl and I think can improve our estimation and reduce some bias around the point estimates will not be the focus of the manuscript. 
+
+```{r data_import, include = F, echo = FALSE}
+# Set working directory and read in files --------------------------------------
+# Direct path 
+path <- paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
+               "wildfire_washington/analysis/analysis_data")
+# Infile case-crossover dataframes ---------------------------------------------
+# Dataframes made in 'chars_3month_binary_smoke_may2016 script
+# resp exacerbations
+resp_casecross <- read_csv(paste(path, "resp1_jul_to_oct_casecross.csv", 
+                                 sep = "/"))
+# asthma
+asthma_casecross <- read_csv(paste(path, "asthma1_jul_to_oct_casecross.csv", 
+                                   sep = "/"))
+# copd 
+copd_casecross <- read_csv(paste(path, "copd1_jul_to_oct_casecross.csv", 
+                                 sep = "/"))
+# copd exacerbations
+copd_ex_casecross <- read_csv(paste(path, "copd_ex1_jul_to_oct_casecross.csv",
+                                    sep="/"))
+# pneum or bronchitis
+pneum_casecross <- read_csv(paste(path, "pneum1_jul_to_oct_casecross.csv",
+                                  sep="/"))
+# acute bronchitis
+acute_bronch_casecross <- read_csv(paste(path, 
+                                   "acute_bronch1_jul_to_oct_casecross.csv",
+                                         sep = "/"))
+# cvd
+cvd_casecross <- read_csv(paste(path, "cvd1_jul_to_oct_casecross.csv",
+                                sep="/"))
+# arrhythmia
+arrhythmia_casecross <- read_csv(paste(path, "arrhythmia1_jul_to_oct_casecross.csv",
+                                 sep="/"))
+# cerebral vascular
+cereb_vas_casecross <- read_csv(paste(path, "cereb_vas1_jul_to_oct_casecross.csv",
+                                sep="/"))
+# heart failure
+hf_casecross <- read_csv(paste(path, "hf1_jul_to_oct_casecross.csv", 
+                               sep="/"))
+# ischemic heart disease
+ihd_casecross <- read_csv(paste(path, "ihd1_jul_to_oct_casecross.csv",
+                                sep="/"))
+# myo infarc
+mi_casecross <- read_csv(paste(path, "mi1_jul_to_oct_casecross.csv", sep="/"))
+# RA
+ra_casecross <- read_csv(paste(path, "ra1_jul_to_oct_casecross.csv", sep="/"))
+# broken arm
+broken_arm_casecross <- read_csv(paste(path, "broken_arm1_jul_to_oct_casecross.csv",
+                                       sep="/"))
+
+# zip smoke pm 
+#zip_pm <- read_csv(paste(path, "../smoke/zip_population_weighted_pm/zip_pm_to_merge_with_chars.csv",
+#                         sep="/"))
+
+```
+
+## Methods Description
+
+In these comparisons, we examine various methods of smoke/PM~2.5~ estimations and associations with health outcomes using a time-stratified case-crossover study design. Health outcomes for a patient with a primary diagnosis of cardiopulmonary health outcomes were identified. We then created counterfactual observations for each patient for the same day of the week for up to 8 weeks before, and up to 8 weeks after their admission. We further limited our analyses to claims that were coded as emergency or urgent visits to eliminate bias from patients going in for elective/planned procedures. The health outcomes of interest are respiratory, asthma, COPD, COPD exacerbation, pneumonia, acute bronchitis, cardiovascular disease, heart failure, ischemic heart disease, and myocardial infarction. I also included rheumatoid arthritis for my own interests and broken arm(which you would hypothesize to not be associated with wildfire smoke exposure).
+
+As for exposure methods, there are four main estimation methods for PM~2.5~: WRF-Chem Smoke (which substracts the WRF-Chem no fire emission from WRF-chem). For the WRF-Chem variable with the 'smoke' designator, this is WRF-Chem - WRF-Chem no fire. For Global Regression, Geo-Weighted Regression, and Kriging with 'smk' designator, I subtracted off the 'Background' estimates of smoke, which I believe are the monthly averages of PM~2.5~ for a given grid.
+
+Below is the first loop, which will run conditional logistic regression models for each patient identified as having the outcome of interest in Washington state from July 1, 2012 to October 31, 2012. I estimated counterfactual observations of 'no events' for each patient up to 8 weeks before and after the admission date of the claim. For patients who have a admission date closer to July 1, 2012 or closer to October 31, 2012, their counterfactual  observations before or after these dates will be excluded as I will not be able to assign estimates of PM~2.5~ to these counterfactual observations. 
+
+Furthermore, as symmetry of counterfactual observations included before and after reduces bias (Schwartz 2001), I only include symmetric counterfactual observations. For example, if  subject has 8 observations before the event with PM~2.5~ values and only 1 observation after the event with PM~2.5~ values, 
+
+Each conditional logistic regression model accounts for the subject, and adjusts for temperature from the WRF-Chem model.
+
+### Time-Stratified Case-Crossover Results (symmetric bi-directional multiple observations)
+
+```{r symmetrical and bi-directional, echo = F, results='asis'} 
+# note above, results = 'asis' needed to print htmlTables
+# Analyses ---------------------------------------------------------------------
+# look up admit type, may want to subset to specifc admit
+# ADM_TYPE variable: 1 = emergency, 2 = urgent, 3 = elective, 4 = newborn
+# 5 = trauma, 9 = info not available
+
+# I removed copd exacerbation and rheuamtoid arthritis
+
+# dataframe list
+df_list <- list(resp_casecross, asthma_casecross, copd_casecross, pneum_casecross,
+                acute_bronch_casecross, cvd_casecross, arrhythmia_casecross,
+                cereb_vas_casecross, hf_casecross, ihd_casecross, mi_casecross, 
+                broken_arm_casecross)
+
+outcome_list <- c('All Respiratory', 'Asthma', 'COPD', 'Pneumonia', 
+                  'Acute Bronchitis', 'Cardiovascular Disease', 'Arrhythmia', 
+                  'Cerebrovascular Disease', 'Heart Failure',
+                  'Ischemic Heart Disease', 'Myocardial Infarction', 'Broken Arm')
+
+# looking only at wrf chem, kriging, and geo-weighted; taking out 'Global Smoke' method
+method_list <- c('WRF-Chem Smoke', 'Kriging Smoke', 'Geo-Weighted Smoke')
+
+# create an empty list to row bind dataframes together
+datalist <- list()
+
+# Producing conditional logit model estimates loop 
+for(i in 1:length(df_list)){
+
+  df_to_loop <- data.frame(df_list[i])
+  outcome <- colnames(df_to_loop[3])
+
+  outcome_name <- outcome_list[i]
+
+  # extract covariates from dataframe
+  covariates_df <- df_to_loop[, c(1:16, 27:28, 151:155)]
+  
+  # extract pm values and divide by 10 and ordered
+  #which(colnames(df_to_loop)=="global_smk_pm_zip") # code to find column numbers
+  pm_estimates_df <- df_to_loop[, c(19, 26, 24)]/10  # create 10 unit increases
+  
+  # dataframe for analysis creation
+  # bind columns back together 
+  df_analysis <- cbind(covariates_df, pm_estimates_df) %>% 
+    # remove missing pm values
+    filter(!is.na(wrf_smk_pm_zip)) %>% 
+    # limit to emergency or urgent care
+    filter(ADM_TYPE == 1 | ADM_TYPE == 2) %>%
+    # the following code makes sure that the counterfactual values retained are 
+    # symetric in that number of obs before = number of obs after
+    mutate(obs_diff_admission = (date - date_admit)/7) %>% 
+    group_by(PATIENTID) %>% 
+    # identifies the min and max observations, and sets it to the minimum n of obs
+    mutate(min_obs_diff = abs(min(obs_diff_admission)),
+           max_obs_diff = abs(max(obs_diff_admission)),
+           obs_limit = min(c(min_obs_diff, max_obs_diff)),
+           keep_obs = ifelse(abs(obs_diff_admission) <= obs_limit, 1, 0)) %>% 
+    filter(keep_obs == 1)
+
+  # empty df for table
+  table_df <- data.frame()
+  
+  # empty matrix
+  point_estimates <- matrix(nrow = 3, ncol = 9, byrow = T)
+  
+  colnames(point_estimates) <- c('outcome', 'pm_method', 'n', 'n_events', 'odds_ratio', 
+                                 'lower95', 'upper95', 'se', 'p_val')
+  
+  # fill in the outcome name for the dataframe before the loop
+  point_estimates[, 1] <- outcome_name
+
+  
+  # second loop to run a model for each pm estimation method
+    for(j in 24:26){
+
+      # variable to model 
+      var_name <- colnames(df_analysis[j])
+
+      # conditional logistic regression model
+      mod <- clogit(outcome ~ df_analysis[[j]] + wrf_temp_zip + 
+                    strata(PATIENTID), df_analysis)
+
+      # populate matrix
+      row_n <- j-23
+      
+      point_estimates[row_n, 2] <- method_list[row_n]
+      point_estimates[row_n, 3] <- mod$n
+      point_estimates[row_n, 4] <- mod$nevent
+      # odds ratio
+      point_estimates[row_n, 5] <- round(exp(summary(mod)$coefficient[1,1]), 3)
+
+      # 95% lower bound
+      point_estimates[row_n, 6] <- round(exp((summary(mod)$coefficient[1,1]) -
+                                        1.96*(summary(mod)$coefficient[1,3])), 3)
+      # 95% upper bound
+      point_estimates[row_n, 7] <- round(exp((summary(mod)$coefficient[1,1]) +
+                                        1.96*(summary(mod)$coefficient[1,3])), 3)
+      # standard error
+      point_estimates[row_n, 8] <- round(summary(mod)$coefficient[1,3], 4)
+      # p val
+      point_estimates[row_n, 9] <- round(summary(mod)$coefficient[1,5], 4)
+  
+      # save point estimates as a dataframe
+      point_est_df <- as_data_frame(point_estimates)
+      ?as_data_frame
+    }
+  
+# combine previous values in dataframe that has all outcome/methods comparisons
+datalist[[i]] <- point_est_df
+
+}
+
+# combine each outcome itteration in to a big dataset
+combined_point_est_df <- bind_rows(datalist)
+
+glimpse(combined_point_est_df)
+table_df <- cbind(data.frame(method_list), point_est_df[, c(1, 3:7)]) %>% 
+    select(2, 1, 3:7) # rearrange to make the outcome the first variable
+
+
+  glimpse(table_df)
+  
+  tab <- htmlTable(txtRound(table_df, digits = 3, 1:3), 
+           caption = "Association between a 10 ug/m^3 in PM2.5 and Health Outcomes",
+           # row group by outcome
+           #rgroup = outcome_list,
+           #n.rgroup = 3,
+           # column headers
+           header = c("Outcome", "Method", "Obs.", "Events",
+                      "OR&dagger;", "Lower", "Upper"),
+           # column spanner
+           cgroup = c("", "95% CI"), 
+           n.cgroup = c(5, 2),
+           padding.rgroup = "&nbsp;&nbsp;",
+           css.cell = "padding-left: 0.5em; padding-right: .5em;", # cell space
+           align = "llccccc", # column alignment,
+           tfoot="&dagger; Adjusted for temperature, accounting for subject. Symmetric bi-direction; as many counterfactual observations as available"
+            ) # end table
+  
+  print(tab)
+
+```
+
+#### Summary of Symmetric, Bi-Directional Results 
+
+When looking at the associations between and outcomes, WRF-Chem Smoke is significantly associated with all respiratory claims, asthma, CVD,and cerebrovascular disease. However, WRF-Chem smoke is also associated with an increased risk of a broken arm, which doesn't make sense. I included rheumatoid arthritis and broken arm as outcomes as logic checks as they should not be associated.
+
+### Time-Stratified Case-Crossover Results (symmetric bi-directional multiple observations, excluding the first observations before and after the admission)
+
+Similar methods to last time, where counterfactual observations are symmetric, and I only include observations at least 2 weeks away from the admission date to reduce some of the impact of high smoke PM~2.5~ distributions that may persist for a couple days. Similar idea to recovery time.
+
+```{r excluding 1st counter obs, echo = F, results='asis'} 
+# note above, results = 'asis' needed to print htmlTables
+# Analyses ---------------------------------------------------------------------
+
+# Producing conditional logit model estimates loop -----------------------------
+for(i in 1:length(df_list)){
+  
+  df_to_loop <- data.frame(df_list[i])
+  outcome <- colnames(df_to_loop[3])
+
+  outcome_name <- outcome_list[i]
+  
+  # extract covariates from dataframe
+  covariates_df <- df_to_loop[, c(1:14, 25:26, 77:86)]
+  # extract pm values and divide by 10 and ordered
+  pm_estimates_df <- df_to_loop[, c(17, 22:24)]/10  # create 10 unit increases
+  # bind columns back together
+  df_analysis <- cbind(covariates_df, pm_estimates_df) %>% 
+    filter(!is.na(wrf_smk_pm)) %>% 
+    # limit to emergency or urgent care
+    filter(ADM_TYPE == 1 | ADM_TYPE == 2) %>%
+    # the following code makes sure that the counterfactual values retained are 
+    # symetric in that number of obs before = number of obs after
+    mutate(obs_diff_admission = (date - date_admit)/7) %>% 
+    group_by(PATIENTID) %>% 
+    # identifies the min and max observations, and sets it to the minimum n of obs
+    mutate(min_obs_diff = abs(min(obs_diff_admission)),
+           max_obs_diff = abs(max(obs_diff_admission)),
+           obs_limit = min(c(min_obs_diff, max_obs_diff)),
+           keep_obs = ifelse(abs(obs_diff_admission) <= obs_limit, 1, 0),
+           # excludes the 1st counterfactual observation bf/after admission
+           keep_obs2 = ifelse(obs_diff_admission == -1 | obs_diff_admission == 1 , 0, 1),
+           # get rid of people with single observations
+           keep_obs3 = ifelse(obs_limit >= 3, 1, 0)) %>% 
+    filter(keep_obs == 1 & keep_obs2 == 1 & keep_obs3 == 1)
+
+  # second loop to run a model for each pm estimation method
+  
+  # empty df for table
+  table_df <- data.frame()
+  
+  # empty matrix
+  point_estimates <- matrix(nrow = 4, ncol = 8, byrow = T)
+  
+  colnames(point_estimates) <- c('pm_method', 'n', 'n_events', 'odds_ratio', 
+                                 'lower95', 'upper95', 'se', 'p_val')
+  
+
+    for(j in 27:30){
+      
+      # variable to model 
+      var_name <- colnames(df_analysis[j])
+
+      # conditional logistic regression model
+      mod <- clogit(outcome ~ df_analysis[[j]] + wrf_temp + 
+                    strata(PATIENTID), df_analysis)
+summary(mod)
+      # populate matrix
+      row_n <- j-26
+
+      point_estimates[row_n, 1] <- var_name
+      point_estimates[row_n, 2] <- mod$n
+      point_estimates[row_n, 3] <- mod$nevent
+      # odds ratio
+      point_estimates[row_n, 4] <- round(exp(summary(mod)$coefficient[1,1]), 3)
+
+      # 95% lower bound
+      point_estimates[row_n, 5] <- round(exp((summary(mod)$coefficient[1,1]) -
+                                        1.96*(summary(mod)$coefficient[1,3])), 3)
+      # 95% upper bound
+      point_estimates[row_n, 6] <- round(exp((summary(mod)$coefficient[1,1]) +
+                                        1.96*(summary(mod)$coefficient[1,3])), 3)
+      # standard error
+      point_estimates[row_n, 7] <- round(summary(mod)$coefficient[1,3], 4)
+      # p val
+      point_estimates[row_n, 8] <- round(summary(mod)$coefficient[1,5], 4)
+  
+      # save point estimates as a dataframe
+      point_est_df <- data.frame(point_estimates)
+      assign(paste(outcome, "point_est", sep = '_'), point_est_df) 
+    }
+  
+  table_df <- cbind(data.frame(method_list), point_est_df[, 2:6])
+  
+  tab <- htmlTable(txtRound(table_df, digits = 3, 1:3 ), 
+           caption = paste("Association between a 10 ug/m^3 in PM2.5 and",
+                           outcome_name, sep = " "),
+           header = c("Method", "Obs.", "Events",
+                      "OR&dagger;", "Lower", "Upper"),
+           cgroup = c("", "95% CI"), # spanner
+           n.cgroup = c(4, 2),
+           padding.rgroup = "&nbsp;&nbsp;",
+           css.cell = "padding-left: 0.5em; padding-right: .5em;", # cell space
+           align = "lccccc", # column alignment,
+           tfoot="&dagger; Adjusted for temperature, accounting for subject. Symmetric bi-direction; excluding the first counterfactual observation."
+            ) # end table
+  
+  print(tab)
+}
+
+
+```
+
+#### Summary of Results (symmetric bi-directional multiple observations, excluding the first observations before and after the admission)
+These methods appear to be more in line with what we'd expect.
+
+#### All Respiratory
+A 10 ug/m^3 increases in WRF-Chem smoke PM~2.5~ is associated with a 5% increase in all respiratory ED or urgent care visits, adjusting for temperature and accounting for within subject variability. No other measures of smoke PM~2.5~ was associated with all respiratory outcomes.
+
+#### Asthma
+
+For asthma, all estimation methods are significantly associated with an increase in asthma. This is what we'd expect. This is also the outcome I use as a check as this is the association that is consistently associated with wildfire smoke across studies.
+
+#### COPD
+
+For COPD, the WRF-Chem smoke estimation methods produce conflicting results of no association with COPD when compared to Geo-Weighted, Global, and Kriging smoke methods, all of which show a significant increase in COPD claims for 10 ug/m^3 increases in PM~2.5~. Most of these COPD events are likely COPD exacerbation (93%).
+
+#### Pneumonia
+
+No significant associations between PM~2.5~ and pneumonia.
+
+#### Acute Bronchitis
+
+No significant associations between PM~2.5~ and acute bronchitis.
+
+#### Cardiovascular Diseases (CVD)
+
+WRF-Chem smoke is significantly associated with all CVD ED or urgent care visits, but the other smoke estimates are not associated.WRF-Chem smoke was also associated with cerebrovascular disease, IHD, and MI.
+
+#### Rheumatoid Arthritis and Broken Arm
+
+I looked at these outcomes as well as a sort of 'control' outcome to make sure my case-crossover analyses seemed appropriate, as we would hypothesize no association with smoke and these outcomes. WRF-Chem wildfire smoke PM~2.5~ was significnatly associated with an increase broken arm ED or urgent care visit. This raises a question still about how to define the reference periods.
+
+
+### Time-Stratified Case-Crossover Results (symmetric bi-directional multiple observations, including only 3rd and 4th observations before and after the admission)
+
+```{r including 3rd and 4th counter obs, echo = F, results='asis'} 
+# note above, results = 'asis' needed to print htmlTables
+# Analyses ---------------------------------------------------------------------
+
+# Producing conditional logit model estimates loop -----------------------------
+for(i in 1:length(df_list)){
+  
+  df_to_loop <- data.frame(df_list[i])
+  outcome <- colnames(df_to_loop[3])
+
+  outcome_name <- outcome_list[i]
+  
+  # extract covariates from dataframe
+  covariates_df <- df_to_loop[, c(1:14, 25:26, 77:86)]
+  # extract pm values and divide by 10 and ordered
+  pm_estimates_df <- df_to_loop[, c(17, 22:24)]/10  # create 10 unit increases
+  # bind columns back together
+  df_analysis <- cbind(covariates_df, pm_estimates_df) %>% 
+    filter(!is.na(wrf_smk_pm)) %>% 
+    # limit to emergency or urgent care
+    filter(ADM_TYPE == 1 | ADM_TYPE == 2) %>%
+    # the following code makes sure that the counterfactual values retained are 
+    # symetric in that number of obs before = number of obs after
+    mutate(obs_diff_admission = (date - date_admit)/7) %>% 
+    group_by(PATIENTID) %>% 
+    # identifies the min and max observations, and sets it to the minimum n of obs
+    mutate(min_obs_diff = abs(min(obs_diff_admission)),
+           max_obs_diff = abs(max(obs_diff_admission)),
+           obs_limit = min(c(min_obs_diff, max_obs_diff)),
+           keep_obs = ifelse(abs(obs_diff_admission) <= obs_limit, 1, 0),
+           # excludes the 1st counterfactual observation bf/after admission
+           keep_obs2 = ifelse(obs_diff_admission == 0 | obs_diff_admission == 3 |
+                              obs_diff_admission == -3 | obs_diff_admission == 4 |
+                              obs_diff_admission == -4, 1, 0),
+           # get rid of people with single observations
+           keep_obs3 = ifelse(obs_limit >= 3, 1, 0)) %>% 
+    filter(keep_obs == 1 & keep_obs2 == 1 & keep_obs3 == 1)
+
+  # second loop to run a model for each pm estimation method
+  
+  # empty df for table
+  table_df <- data.frame()
+  
+  # empty matrix
+  point_estimates <- matrix(nrow = 4, ncol = 8, byrow = T)
+  
+  colnames(point_estimates) <- c('pm_method', 'n', 'n_events', 'odds_ratio', 
+                                 'lower95', 'upper95', 'se', 'p_val')
+  
+
+    for(j in 27:30){
+      
+      # variable to model 
+      var_name <- colnames(df_analysis[j])
+
+      # conditional logistic regression model
+      mod <- clogit(outcome ~ df_analysis[[j]] + wrf_temp + 
+                    strata(PATIENTID), df_analysis)
+
+      # populate matrix
+      row_n <- j-26
+
+      point_estimates[row_n, 1] <- var_name
+      point_estimates[row_n, 2] <- mod$n
+      point_estimates[row_n, 3] <- mod$nevent
+      # odds ratio
+      point_estimates[row_n, 4] <- round(exp(summary(mod)$coefficient[1,1]), 3)
+
+      # 95% lower bound
+      point_estimates[row_n, 5] <- round(exp((summary(mod)$coefficient[1,1]) -
+                                        1.96*(summary(mod)$coefficient[1,3])), 3)
+      # 95% upper bound
+      point_estimates[row_n, 6] <- round(exp((summary(mod)$coefficient[1,1]) +
+                                        1.96*(summary(mod)$coefficient[1,3])), 3)
+      # standard error
+      point_estimates[row_n, 7] <- round(summary(mod)$coefficient[1,3], 4)
+      # p val
+      point_estimates[row_n, 8] <- round(summary(mod)$coefficient[1,5], 4)
+  
+      # save point estimates as a dataframe
+      point_est_df <- data.frame(point_estimates)
+      assign(paste(outcome, "point_est", sep = '_'), point_est_df) 
+    }
+  
+  table_df <- cbind(data.frame(method_list), point_est_df[, 2:6])
+  
+  tab <- htmlTable(txtRound(table_df, digits = 3, 1:3 ), 
+           caption = paste("Association between a 10 ug/m^3 in PM2.5 and",
+                           outcome_name, sep = " "),
+           header = c("Method", "Obs.", "Events",
+                      "OR&dagger;", "Lower", "Upper"),
+           cgroup = c("", "95% CI"), # spanner
+           n.cgroup = c(4, 2),
+           padding.rgroup = "&nbsp;&nbsp;",
+           css.cell = "padding-left: 0.5em; padding-right: .5em;", # cell space
+           align = "lccccc", # column alignment,
+           tfoot="&dagger; Adjusted for temperature, accounting for subject. Symmetric bi-direction; including only the 3rd and 4th counterfactual observations."
+            ) # end table
+  
+  print(tab)
+}
+
+
+```
+
+#### Summary of Results (symmetric bi-directional multiple observations, including only 3rd and 4th observations before and after the admission)
+
+In general this approach produces results that converge in conclusion for all respiratory outcomes and asthma outcomes, which is what we'd expect. WRF-Chem smoke also produces significant associations with all CVD outcomes and MI to name a few. However, WRF-Chem smoke is also significantly associated with broken arm outcomes, which is not what we expect. This may raise questions about WRF-Chem, and again raises some more questions about how to best define the referent period.
+
+### Sensitivty Analysis: Defining the Reference Period
+
+The following figures and tables show different scenarios of point estimates the association between geo-weighted smoke PM~2.5~ and asthma, myocardial infarction, and broken arm, where I vary the symmetric bi-directional referent/counterfactual period from 1 to 8 observations, where observation represents 7 days before or after the admission date. So, for example,  2 observations, that is a referent period 14 days before and after admission date; only these referent dates are included in each variation of analyses (i.e. only observations that equal -2 or 2 are included as referent periods, unlike my other results).  
+
+**Note: 1 observation period = 7 days**
+
+```{r sensitivity analysis of time frames, echo = F, results='asis'} 
+
+# look at asthma, MI, and broken arm
+
+# smaller dataframe list
+reduced_df_list <- list(asthma_casecross, mi_casecross, broken_arm_casecross)
+
+reduced_outcome_list <- c('Asthma', 'Myocardial Infarction', 'Broken Arm')
+
+# i want to overlay geo-weighted smoke pm values on the count figures over this time
+# same values; can be made outside the loop
+median_geo_smk <- zip_pm %>% filter(!is.na(geo_smk_pm)) %>% 
+    group_by(date) %>% summarise(geo_smk_pm_med = median(geo_smk_pm))
+
+
+for(i in 1:length(reduced_df_list)){
+
+  df_to_loop <- data.frame(reduced_df_list[i])
+  outcome <- colnames(df_to_loop[3])
+
+  outcome_name <- reduced_outcome_list[i]
+  
+  # extract covariates from dataframe
+  covariates_df <- df_to_loop[, c(1:14, 25:26, 77:86)]
+  # extract pm values and divide by 10 and ordered
+  pm_estimates_df <- df_to_loop[, c(17,22)]/10  # create 10 unit increases
+  # bind columns back together
+  
+  # empty matrix for odds ratio
+  odds_ratio <- matrix(nrow = 8, ncol = 8, byrow = T)
+  
+  colnames(odds_ratio) <- c('ref_obs', 'n', 'n_events', 'odds_ratio', 
+                            'lower95', 'upper95', 'se', 'p_val')
+  
+  # empty dataframe for small-multiples for referent obsrvations graph
+  count_df <- data_frame()
+    
+  # loop through symmetric observations
+  for(j in 1:8){
+
+  # limit to patients with observations == j
+  df_patient_obs <- cbind(covariates_df, pm_estimates_df) %>% 
+    filter(!is.na(geo_smk_pm)) %>% 
+    # limit to emergency or urgent care
+    filter(ADM_TYPE == 1 | ADM_TYPE == 2) %>%
+    # the following code makes sure that the counterfactual values retained are 
+    # symetric in that number of obs before = number of obs after
+    mutate(obs_diff_admission = (date - date_admit)/7) %>% 
+    group_by(PATIENTID) %>% 
+    # identifies the min and max observations, and sets it to the minimum n of obs
+    # this first chunk of code creates the symmetry of observations
+    mutate(min_obs_diff = abs(min(obs_diff_admission)),
+           max_obs_diff = abs(max(obs_diff_admission)),
+           obs_limit = min(c(min_obs_diff, max_obs_diff)),
+           keep_obs = ifelse(abs(obs_diff_admission) <= obs_limit, 1, 0),
+           # excludes the 1st counterfactual observation bf/after admission
+           keep_obs2 = ifelse(obs_diff_admission == 0 | obs_diff_admission == j |
+                              obs_diff_admission == -j, 1, 0),
+           obs_type = ifelse(outcome == 1, "Observed", "Referent")) %>% 
+    # limit df to those that meet the criteria
+    filter(keep_obs == 1 & keep_obs2 == 1) 
+  
+  # (think about a more efficient way to do this)
+  n_obs <- df_patient_obs %>% 
+    group_by(PATIENTID) %>% 
+    summarise(n_obs = n())
+
+    # join with counts
+  df_analysis <- left_join(df_patient_obs, n_obs, by = "PATIENTID") %>% 
+    # filter, exculding those with 1 observation
+    filter(n_obs != 1)
+  
+  # summary dataframe of counts of observation types
+  counts_by_obs_type <- df_analysis %>% group_by(obs_type, date) %>% 
+    summarise(obs = n()) %>%  mutate(ref_period = j)
+  
+  count_df <- count_df %>% rbind.data.frame(counts_by_obs_type)
+  
+  # check min max of obs 
+  # summary(as.numeric(df_analysis$n_obs))
+  # this works
+  
+  # run model
+  # conditional logistic regression model
+  mod <- clogit(outcome ~ geo_smk_pm + wrf_temp + strata(PATIENTID), 
+                df_analysis)
+  summary(mod)
+  # populate matrix
+  odds_ratio[j, 1] <- j
+  odds_ratio[j, 2] <- mod$n
+  odds_ratio[j, 3] <- mod$nevent
+  # odds ratio
+  odds_ratio[j, 4] <- round(exp(summary(mod)$coefficient[1,1]), 3)
+  # 95% lower bound
+  odds_ratio[j, 5] <- round(exp((summary(mod)$coefficient[1,1]) -
+                                    1.96*(summary(mod)$coefficient[1,3])), 3)
+  # 95% upper bound
+  odds_ratio[j, 6] <- round(exp((summary(mod)$coefficient[1,1]) +
+                                    1.96*(summary(mod)$coefficient[1,3])), 3)
+  # standard error
+  odds_ratio[j, 7] <- round(summary(mod)$coefficient[1,3], 4)
+  # p val
+  odds_ratio[j, 8] <- round(summary(mod)$coefficient[1,5], 4)
+  # save point estimates as a dataframe
+  or_df <- data.frame(odds_ratio)
+  assign(paste(outcome, "point_est", sep = '_'), or_df)   
+  
+  }
+  
+    # plot of odds ratios for outcome with varying referent periods
+  #ticks<-c(seq(0.001, 1.0, by =0.1), seq(1.0, 10, by =1))
+  breaks <- round(10^(c(-9, -1, -.3, 0, .3, 0.699, 1)), 2)
+
+  print_plot <- ggplot(or_df, aes(x = ref_obs, y = odds_ratio, label = n_events)) + 
+    geom_point() + geom_text(vjust = 0, nudge_x = 0.3) + 
+    geom_errorbar(aes(ymin=lower95, ymax=upper95), width = 0.2) +
+    scale_y_log10(breaks = breaks, limits = c(0.01,10)) +
+    scale_x_continuous(breaks = c(1:8)) +
+    geom_hline(yintercept = 1, linetype=2) +
+    ggtitle(paste('Association between Geo-Weighted Smoke PM2.5 on ', outcome_name, sep = '')) +
+    ylab('Odds Ratio for 10µg/m^3 increase in PM2.5') +
+    xlab('Symmetric Bi-Directional Referent Period') +
+    theme(panel.background = element_rect(fill = 'white', colour = 'black'),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.title.y = element_text(angle = 90))  
+  
+  print(print_plot)
+  
+
+  # print out table estimats too
+  or_table <- or_df[, 1:6]
+  
+  tab <- htmlTable(txtRound(or_table, digits = 3, 1:3 ), 
+           caption = paste("Sensitivity analysis of bi-symmetric reference periods on the association between a 10 ug/m^3 in PM2.5 and",
+                           outcome_name, sep = " "),
+           header = c("Reference Period", "Obs.", "Events",
+                      "OR&dagger;", "Lower", "Upper"),
+           cgroup = c("", "95% CI"), # spanner
+           n.cgroup = c(4, 2),
+           padding.rgroup = "&nbsp;&nbsp;",
+           css.cell = "padding-left: 0.5em; padding-right: .5em;", # cell space
+           align = "lccccc", # column alignment,
+           tfoot="&dagger; Adjusted for temperature, accounting for subject."
+            ) # end table
+  
+  print(tab)
+  
+  # plot of observed vs unobserved using the summarized count df created above
+
+obs_plot <- ggplot(count_df, aes(x = date, y = obs)) + 
+    geom_point(aes(colour = as.factor(obs_type))) +
+    scale_colour_manual('Observation Type', values = c('Observed' = 'red', 'Referent' = 'blue')) +
+    facet_wrap(~ref_period, scales = 'fixed', ncol = 4, nrow=2) +
+    ggtitle(paste('Number of Observations by nth Referent Period for ',
+                  outcome_name, sep = '')) +
+    ylab('Count of Observations') +
+    xlab('Date') +
+    theme(panel.background = element_rect(fill = 'white', colour = 'black'),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.title.y = element_text(angle = 90))  
+  
+  print(obs_plot)
+
+  
+}
+
+```
+
+#### Summary of Results for Varying Symmetric Referent Periods
+
+In these sensitivity analyses where we varied the symmetric, bi-directional referent period, we observed a couple key points when looking at the relationship between geo-weighted smoke PM~2.5~ (our 'best' estimate of smoke PM~2.5~) and asthma (our representative respiratory outcome we hypothesize to be significantly associated with smoke), myocardial infarction (our representative cardiovascular outcome of interest), and broken arm (which we should not be associated with smoke). 
+
+**General Conclusions:** 
+1. Symmetry in referent periods is good thing to work in to the case-crossover. This conclusion is based more on evidence from exisitng studies, not necissarily from these data.
+
+2. Referent periods 3 through 6 produce similar estimates for asthm a, which may indicate robustness of these timeframes. 
+
+3. Period 1, may be subject to some bias as we are not accounting for recovery time (person re-entering risk pool), even though the distributions of counts of observed admissions for an event and their counterfactual periods are the most evenly-distributed through this time period. 
+
+4. Periods 7 and 8 are extremely bias as this is just overly restrictive and selects people with events only at the start of September. 
+
+5. Including referent periods from 3 through 6 may be the best strategy for selecting referent periods as this would increase our sample size and reduce some bias by averaging the bias that might exist at each referent period for that individual observation, for each specific outcome.
+
+*Note for Jeff*: I was thinking a bit more about referent periods 5 and 6, and even though some odd patterns start to emerge, these estimates are still relatively resonable (based on figures) as you have a sufficient number of observations from other non-smoke impacted regions that offer information to the models as well. 
+
+## Overall Summary of Results
+
+From these different methods of defining the counterfactual referent periods, it leads me to believe that defining the referent period is very important in reducing the bias in a case-cross over study. The major goal is to best define the exchangable period for the subject. As Bateson and Schwartz also show in their 2001 paper, *Selection Bias and Confounding in Case-Crossover Analyses of Environmental Time-Series Data*, if the referent/counterfactual periods are not symmetric, this can also introduce bias. Also, they show that the bias induced can be directly proportional to the shape of the concentrations of the PM~2.5~ values. If a subject experiences an event at the start of a period of elevated smoke PM~2.5~, and smoke is elevated for ~two weeks, choosing a referent period within those two weeks is not exchangable, and hence not appropriate. This aligns with the 'recovery period' Sheryl and I have been thinking about.
+
+
+#### To do
+1. Appropriately defining the referent period is important before we can publish this.
+2. Try a time-series study to see if we can produce results that converge between the two designs.
