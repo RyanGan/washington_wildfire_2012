@@ -21,10 +21,9 @@ Note, epidemiological methods that Sheryl and I think can improve our estimation
 
 ```{r data_import, include = F, echo = FALSE}
 # Set working directory and read in files --------------------------------------
-# Relative path 
-path <- paste0("C:/Users/RGan/Google Drive/CSU/wildfire",
-               "/washington/case_crossover_dataframes")
-
+# Direct path 
+path <- paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
+               "wildfire_washington/analysis/analysis_data")
 # Infile case-crossover dataframes ---------------------------------------------
 # Dataframes made in 'chars_3month_binary_smoke_may2016 script
 # resp exacerbations
@@ -70,8 +69,8 @@ broken_arm_casecross <- read_csv(paste(path, "broken_arm1_jul_to_oct_casecross.c
                                        sep="/"))
 
 # zip smoke pm 
-zip_pm <- read_csv(paste(path, "../smoke/zip_population_weighted_pm/zip_pm_to_merge_with_chars.csv",
-                         sep="/"))
+#zip_pm <- read_csv(paste(path, "../smoke/zip_population_weighted_pm/zip_pm_to_merge_with_chars.csv",
+#                         sep="/"))
 
 ```
 
@@ -114,17 +113,22 @@ method_list <- c('WRF-Chem Smoke', 'Geo-Weighted Smoke',
 
 # Producing conditional logit model estimates loop -----------------------------
 for(i in 1:length(df_list)){
-
+ i <- 2
   df_to_loop <- data.frame(df_list[i])
   outcome <- colnames(df_to_loop[3])
 
   outcome_name <- outcome_list[i]
 
   # extract covariates from dataframe
-  covariates_df <- df_to_loop[, c(1:14, 25:26, 77:86)]
+  covariates_df <- df_to_loop[, c(1:16, 27:28, 151:155)]
+  
   # extract pm values and divide by 10 and ordered
-  pm_estimates_df <- df_to_loop[, c(17, 22:24)]/10  # create 10 unit increases
-  # bind columns back together
+  which(colnames(df_to_loop)=="global_smk_pm_zip") # code to find column numbers
+  pm_estimates_df <- df_to_loop[, c(19, 24, 26)]/10  # create 10 unit increases
+  
+  glimpse(pm_estimates_df)
+  # dataframe for analysis creation
+  # bind columns back together 
   df_analysis <- cbind(covariates_df, pm_estimates_df) %>% 
     filter(!is.na(wrf_smk_pm)) %>% 
     # limit to emergency or urgent care
@@ -146,10 +150,14 @@ for(i in 1:length(df_list)){
   table_df <- data.frame()
   
   # empty matrix
-  point_estimates <- matrix(nrow = 4, ncol = 8, byrow = T)
+  point_estimates <- matrix(nrow = 4, ncol = 9, byrow = T)
   
-  colnames(point_estimates) <- c('pm_method', 'n', 'n_events', 'odds_ratio', 
+  colnames(point_estimates) <- c('outcome', 'pm_method', 'n', 'n_events', 'odds_ratio', 
                                  'lower95', 'upper95', 'se', 'p_val')
+  
+  # fill in the outcome name for the dataframe before the loop
+  point_estimates[, 1] <- outcome_name
+  
     for(j in 27:30){
       
       # variable to model 
@@ -158,10 +166,11 @@ for(i in 1:length(df_list)){
       # conditional logistic regression model
       mod <- clogit(outcome ~ df_analysis[[j]] + wrf_temp + 
                     strata(PATIENTID), df_analysis)
-summary(mod)
+
       # populate matrix
       row_n <- j-26
 
+      
       point_estimates[row_n, 1] <- var_name
       point_estimates[row_n, 2] <- mod$n
       point_estimates[row_n, 3] <- mod$nevent
@@ -654,17 +663,6 @@ In these sensitivity analyses where we varied the symmetric, bi-directional refe
 
 From these different methods of defining the counterfactual referent periods, it leads me to believe that defining the referent period is very important in reducing the bias in a case-cross over study. The major goal is to best define the exchangable period for the subject. As Bateson and Schwartz also show in their 2001 paper, *Selection Bias and Confounding in Case-Crossover Analyses of Environmental Time-Series Data*, if the referent/counterfactual periods are not symmetric, this can also introduce bias. Also, they show that the bias induced can be directly proportional to the shape of the concentrations of the PM~2.5~ values. If a subject experiences an event at the start of a period of elevated smoke PM~2.5~, and smoke is elevated for ~two weeks, choosing a referent period within those two weeks is not exchangable, and hence not appropriate. This aligns with the 'recovery period' Sheryl and I have been thinking about.
 
-
-### Time-Series Design
-
-```{r asthma time series, echo = F, results='asis'} 
-
-asthma_counts_zip <- asthma_casecross %>% group_by(date) %>% 
-  summarise(asthma_counts = sum(outcome))
-
-ggplot(asthma_counts_zip, aes(y=asthma_counts, x = date)) + geom_point()
-
-```
 
 #### To do
 1. Appropriately defining the referent period is important before we can publish this.
