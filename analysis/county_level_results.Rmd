@@ -100,7 +100,7 @@ outcome_list <- c('All ER or Urgent', 'All Respiratory', 'Asthma', 'COPD',
                   'Heart Failure', 'Ischemic Heart Disease', 'Myocardial Infarction',
                   'Rheumatoid Arthritis', 'Broken Arm')
 
-which(colnames(wash_ts_no_miss_df)=='n_obs_wo_miss')
+#which(colnames(wash_ts_no_miss_df)=='n_obs_wo_miss')
 # plot loop
 for(i in 30:44){
 
@@ -140,7 +140,6 @@ wash_ts_no_miss_df <- wash_ts_df %>%
 
 #summary(wash_ts_no_miss_df)
 
-
 plot <- ggplot(wash_ts_no_miss_df, aes_string(x= 'date', y = 'asthma_n_wo_miss')) +
   geom_jitter() +
   facet_wrap(~county, scales = "free") +
@@ -154,6 +153,7 @@ plot <- ggplot(wash_ts_no_miss_df, aes_string(x= 'date', y = 'asthma_n_wo_miss')
   axis.title.y = element_text(angle = 90))  
 
 print(plot)
+
 
 ```
 
@@ -176,9 +176,20 @@ wash_jul_oct_df <- wash_ts_df %>%
   # set missing outcome values to 0 since missing indicates no ER or urgent care 
   # visits on that date (which is reasonable in sparsely populated counties)
   mutate_each(funs(wo_miss = ifelse(is.na(.), 0, .)), n_obs:ra_n) %>% 
+  # create a binary smoke indicator variable based smk variables >5, >10, and >15 units 
+  mutate(wrf_smk5 = ifelse(wrf_smk_pm >= 5, 1, 0), 
+         wrf_smk10 = ifelse(wrf_smk_pm >= 10, 1, 0),
+         wrf_smk15 = ifelse(wrf_smk_pm >= 15, 1, 0), 
+         geo_smk5 = ifelse(geo_smk_pm >= 5, 1, 0),
+         geo_smk10 = ifelse(geo_smk_pm >= 10, 1, 0),
+         geo_smk15 = ifelse(geo_smk_pm >= 15, 1, 0),
+         krig_smk5 = ifelse(krig_smk_pm >= 5, 1, 0),
+         krig_smk10 = ifelse(krig_smk_pm >= 10, 1, 0),
+         krig_smk15 = ifelse(krig_smk_pm >= 15, 1, 0)) %>% 
   # rescale pm variables to 10 units
   mutate_each(funs(unit10 = ./10), wrf_pm:krig_smk_pm) %>% 
   select(1:2, 30:45, 28:29, 48, 53:55) # subset to variables used in analysis
+
 
 # finding columns to retain
 #which(colnames(wash_jul_oct_df)=='wrf_smk_pm_unit10')
@@ -264,9 +275,19 @@ tab <- htmlTable(txtRound(point_est_df, digits = 3, 2:4),
   
 print(tab)
   
-# model_adj <- glm(asthma_n_wo_miss ~ geo_smk_pm_unit10 + wrf_temp + as.factor(county), wash_jul_oct_df, family=quasipoisson)
-# summary(model_adj)
+
 }
+
+
+```
+
+```{r interaction with pm and smoke, eval = F, warning= F,}
+# use the wash_jul_oct df to test interaction in the poisson model 
+
+model_adj <- glmer(asthma_n_wo_miss ~ geo_wt_pm_unit10 + geo_smk10 + 
+                 geo_wt_pm_unit10*geo_smk10 + wrf_temp + (1|county), 
+                 wash_jul_oct_df, family='poisson')
+summary(model_adj)
 
 
 ```
@@ -314,7 +335,7 @@ for(i in 1:length(df_list)){
   #glimpse(df_to_loop)
 
   # find the column numbers for the county-level temp and pbl
-  # which(colnames(df_to_loop)=="day") 
+  #which(colnames(df_to_loop)=="geo_wt_pm_county") 
   # extract covariates from dataframe
   covariates_df <- df_to_loop[, c(1:16, 94:95, 151:155)]
   # extract pm values and divide by 10 and ordered
@@ -327,7 +348,18 @@ for(i in 1:length(df_list)){
     filter(ADM_TYPE == 1 | ADM_TYPE == 2) %>%
     # the following code makes sure that the counterfactual values retained are 
     # symetric in that number of obs before = number of obs after
-    mutate(obs_diff_admission = (date - date_admit)/7) %>% 
+    mutate(obs_diff_admission = (date - date_admit)/7) %>%
+      # create a binary smoke indicator variable based smk variables >5, >10, and >15 units 
+    mutate(wrf_smk5 = ifelse(wrf_smk_pm_county >= 5, 1, 0), 
+           wrf_smk10 = ifelse(wrf_smk_pm_county >= 10, 1, 0),
+           wrf_smk15 = ifelse(wrf_smk_pm_county >= 15, 1, 0), 
+           geo_smk5 = ifelse(geo_smk_pm_county >= 5, 1, 0),
+           geo_smk10 = ifelse(geo_smk_pm_county >= 10, 1, 0),
+           geo_smk15 = ifelse(geo_smk_pm_county >= 15, 1, 0),
+           krig_smk5 = ifelse(krig_smk_pm_county >= 5, 1, 0),
+           krig_smk10 = ifelse(krig_smk_pm_county >= 10, 1, 0),
+           krig_smk15 = ifelse(krig_smk_pm_county >= 15, 1, 0)) %>% 
+    # group by patient id to do some within subject data manipulation
     group_by(PATIENTID) %>% 
     # identifies the min and max observations, and sets it to the minimum n of obs
     mutate(min_obs_diff = abs(min(obs_diff_admission)),
@@ -336,10 +368,13 @@ for(i in 1:length(df_list)){
            keep_obs = ifelse(abs(obs_diff_admission) <= obs_limit, 1, 0),
            # excludes the 1st counterfactual observation bf/after admission
            keep_obs2 = ifelse(obs_diff_admission == 0 | obs_diff_admission == 3 |
-                              obs_diff_admission == -3, 1, 0),
+                              obs_diff_admission == -3 | obs_diff_admission == 4 |
+                              obs_diff_admission == -4 | obs_diff_admission == 5 |
+                              obs_diff_admission == -5 , 1, 0),
            # get rid of people with single observations
            keep_obs3 = ifelse(obs_limit >= 3, 1, 0)) %>% 
     filter(keep_obs == 1 & keep_obs2 == 1 & keep_obs3 == 1)
+
 
   # second loop to run a model for each pm estimation method
   
@@ -409,7 +444,7 @@ for(i in 1:length(df_list)){
 
 ```
 
-### Time-Series Results (Zipcode)
+### Time-Stratified Case-Crossover Results (Zipcode)
 
 I'm including the time-stratified case-crossover results using a referent period of 3 observations (weeks) before or after the observed event, where zip code as the spatial unit to assign PM~2.5~. This would offer a direct comparison to county-level estimates.
 
