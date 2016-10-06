@@ -88,7 +88,7 @@ Each conditional logistic regression model accounts for the subject, and adjusts
 
 ### Time-Stratified Case-Crossover Results (symmetric bi-directional multiple observations)
 
-```{r symmetrical and bi-directional, echo = F, results='asis'} 
+```{r symmetrical and bi-directional obs 3 4 5, echo = F, results='asis'} 
 # note above, results = 'asis' needed to print htmlTables
 # Analyses ---------------------------------------------------------------------
 # look up admit type, may want to subset to specifc admit
@@ -144,8 +144,15 @@ for(i in 1:length(df_list)){
     mutate(min_obs_diff = abs(min(obs_diff_admission)),
            max_obs_diff = abs(max(obs_diff_admission)),
            obs_limit = min(c(min_obs_diff, max_obs_diff)),
-           keep_obs = ifelse(abs(obs_diff_admission) <= obs_limit, 1, 0)) %>% 
-    filter(keep_obs == 1)
+           keep_obs = ifelse(abs(obs_diff_admission) <= obs_limit, 1, 0),
+           # excludes the 1st counterfactual observation bf/after admission
+           keep_obs2 = ifelse(obs_diff_admission == 0 | obs_diff_admission == 3 |
+                              obs_diff_admission == -3 | obs_diff_admission == 4 |
+                              obs_diff_admission == -4 | obs_diff_admission == 5 |
+                              obs_diff_admission == -5, 1, 0),
+           # get rid of people with single observations
+           keep_obs3 = ifelse(obs_limit >= 3, 1, 0)) %>% 
+    filter(keep_obs == 1 & keep_obs2 == 1 & keep_obs3 == 1)
 
   # empty df for table
   table_df <- data.frame()
@@ -200,31 +207,28 @@ datalist[[i]] <- point_est_df
 
 }
 
-# combine each outcome itteration in to a big dataset
+# combine each outcome dataframe itteration in to a big dataset
 combined_point_est_df <- bind_rows(datalist)
 
-glimpse(combined_point_est_df)
-table_df <- cbind(data.frame(method_list), point_est_df[, c(1, 3:7)]) %>% 
-    select(2, 1, 3:7) # rearrange to make the outcome the first variable
+# subset columns I want to put in to the table
+table_df <- combined_point_est_df %>% select(2, 3:7) 
 
 
-  glimpse(table_df)
-  
   tab <- htmlTable(txtRound(table_df, digits = 3, 1:3), 
            caption = "Association between a 10 ug/m^3 in PM2.5 and Health Outcomes",
            # row group by outcome
-           #rgroup = outcome_list,
-           #n.rgroup = 3,
+           rgroup = outcome_list,
+           n.rgroup = c(rep(3, 12)),
            # column headers
-           header = c("Outcome", "Method", "Obs.", "Events",
+           header = c("Method", "Obs.", "Events",
                       "OR&dagger;", "Lower", "Upper"),
            # column spanner
            cgroup = c("", "95% CI"), 
-           n.cgroup = c(5, 2),
+           n.cgroup = c(4, 2),
            padding.rgroup = "&nbsp;&nbsp;",
            css.cell = "padding-left: 0.5em; padding-right: .5em;", # cell space
            align = "llccccc", # column alignment,
-           tfoot="&dagger; Adjusted for temperature, accounting for subject. Symmetric bi-direction; as many counterfactual observations as available"
+           tfoot="&dagger; Adjusted for temperature, accounting for subject. Symmetric bi-direction 21, 28, and 38 days before and after."
             ) # end table
   
   print(tab)
