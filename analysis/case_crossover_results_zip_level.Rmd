@@ -21,9 +21,9 @@ Note, epidemiological methods that Sheryl and I think can improve our estimation
 
 ```{r data_import, include = F, echo = FALSE}
 # Set working directory and read in files --------------------------------------
-# Direct path 
-path <- paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
-               "wildfire_washington/analysis/analysis_data")
+# relative path for pc
+path <- paste0("./analysis/analysis_data")
+
 # Infile case-crossover dataframes ---------------------------------------------
 # Dataframes made in 'chars_3month_binary_smoke_may2016 script
 # resp exacerbations
