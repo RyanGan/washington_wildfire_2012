@@ -301,7 +301,6 @@ combined_point_est_df$p_val <- as.numeric(combined_point_est_df$p_val)
     strip.text = element_text(size = 7),
     legend.text = element_text(size = 7)) 
 
-
   print(print_plot)
 
 ```
