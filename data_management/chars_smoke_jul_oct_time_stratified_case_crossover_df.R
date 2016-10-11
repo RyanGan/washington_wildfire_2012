@@ -305,10 +305,11 @@ id_date_df <- data_frame()
 
 # begin second loop to create counterfactual observations for each case subject
         for (i in 1:nrow(single_visits)){
-         # code dates for each id up to two months before and after the event
-         date <- seq(as.Date(single_visits[[i, 12]] - 56), 
+         # code dates for each id up to two months before and after the event (56 days)
+         # note 10/10/16, trying the entire referent periods of 126
+         date <- seq(as.Date(single_visits[[i, 12]] - 126), 
                      # consider every day
-                     as.Date(single_visits[[i, 12]] + 56), by = '1 week') 
+                     as.Date(single_visits[[i, 12]] + 126), by = '1 week') 
 
          # covariates to preserve
          covariate <- single_visits[i, ]%>% 
@@ -323,26 +324,40 @@ id_date_df <- data_frame()
          id_date <- data_frame(date) %>% bind_cols(cov_df)
          # iteration which binds rows of unique ids
          id_date_df <- bind_rows(id_date_df, id_date)
-                                    } # end inner lop
-  
+                                    } # end inner loop
+
 # join with outcome
 outcome_casecross <- id_date_df %>% 
   mutate(date_admit = as.Date(date_admit, '%Y-%m-%d')) %>%
   mutate(outcome = ifelse(date_admit == date, 1, 0)) %>%
+  # filter to July 1st to Oct 31st
+  filter(date >= "2012-07-1" & date <= "2012-10-31") %>% 
   # join with zip-level pm estimates 
   left_join(zip_smoke_w_lag, by = c("date", "ZIPCODE")) %>%
   # join with county-level pm estimates
   left_join(county_smoke_w_lag, by = c("date", "county")) %>% 
   # create variables
   mutate(day = as.factor(weekdays(date)),
-         day_admit = as.factor(weekdays(date_admit)),
-         month_smk = month(date),
-         month_admit = month(date_admit),
-         los = as.numeric(date_discharge - date_admit)) %>%
+    day_admit = as.factor(weekdays(date_admit)),
+    month_smk = month(date),
+    month_admit = month(date_admit),
+    los = as.numeric(date_discharge - date_admit), 
+    season_admit = ifelse(date_admit >= "2012-06-22" &  date_admit <= "2012-09-22",
+                          "summer",
+                   ifelse(date_admit >= "2012-09-23" & date_admit <= "2012-12-21",
+                          "fall", "other")),
+    season_smk = ifelse(date >= "2012-06-22" &  date <= "2012-09-22", "summer",
+                   ifelse(date >= "2012-09-23" & date <= "2012-12-21", "fall",
+                          "other"))) %>%
   arrange(PATIENTID, date) # order by id and date
 
+# checks
+#glimpse(outcome_casecross)
+#which(colnames(outcome_casecross)=='geo_wt_pm_county')
+#check <- outcome_casecross[, c(1:16, 20, 87, 151:157)]
+
 # Create a permanent case-cross over dataset
-file_name <- paste(j, 'jul_to_oct_casecross.csv', sep = '_')
+file_name <- paste(j, 'jul_to_oct_time_strat_casecross.csv', sep = '_')
 
 # write permanent dataset
 write_csv(outcome_casecross, file_name)
