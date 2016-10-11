@@ -5,11 +5,10 @@
 # ------------------------------------------------------------------------------
 
 # Libraries 
-library(readr)
 library(rgdal) # package for shape files
 library(sp)
 library(rgeos) # rgeos package contains the intersect and area commands I need
-library(dplyr)
+library(tidyverse)
 
 
 # Import Shapefiles  -----------------------------------------------------------
