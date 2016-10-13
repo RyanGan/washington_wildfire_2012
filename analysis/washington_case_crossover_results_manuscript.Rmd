@@ -5,12 +5,13 @@ date: "October 11, 2016"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
+```{r library calls, include=FALSE}
 # loading libraries used
 library(tidyverse) # import tidyverse
 library(survival) # for conditional logistic regression
 library(htmlTable) # table
-
+library(lme4) # random-effects model
+library(broom) # broom for tidy data from stats models
 ```
 
 ## Overview
@@ -19,7 +20,7 @@ This document contains updated results for the association between wildfire smok
 
 Note, epidemiological methods that Sheryl and I think can improve our estimation and reduce some bias around the point estimates will not be the focus of the manuscript. 
 
-```{r data_import, include = F, echo = FALSE}
+```{r data import, include = F, echo = FALSE}
 # Set working directory and read in files --------------------------------------
 # direct path for mac
 #path <- paste0("/Users/ryangan/Documents/local_git_repo/wildfire_washington/",
@@ -86,9 +87,9 @@ broken_arm_casecross <- read_csv(paste(path,
                                        "broken_arm1_jul_to_oct_time_strat_casecross.csv",
                                        sep="/"))
 
-# zip smoke pm 
-#zip_pm <- read_csv(paste(path, "../smoke/zip_population_weighted_pm/zip_pm_to_merge_with_chars.csv",
-#                         sep="/"))
+# read county smoke pm for figures 
+county_pm <- read_csv(paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
+            "wildfire_washington/smoke/pm_data/wa_county_pop_wt_pm.csv"))
 
 ```
 
@@ -104,7 +105,35 @@ The **analytic method** is the conditional logistic regression model using the *
 
 I've run a couple different scenarios for selecting referent periods, each of which has some paper that may justify the benefit of the design, relative to other methods.
 
-## Time-Stratified Case-Crossover (referent period same day of the week within the same month)
+### Estimated Daily PM~2.5~ for WRF-Chem and Geo-Weighted Regression by County
+
+These figures represented the population-weighted PM~2.5~ for each county for WRF-Chem and the geo-weighted regression estimation methods (did not include Kriging or global regression to keep figures simple). In some central Washington counties, you can see extremely high PM~2.5~ concentrations starting in September. It is this type of distribution that I think justifies a larger time-frame of season or fire-season to make sure the average of the referent time is a good indicator of a subject's background PM~2.5~ exposure value.
+
+```{r pm time series plot, echo = F, results='asis'}
+
+
+ggplot(county_pm, aes(x = date)) + 
+  scale_x_date(date_labels = '%m')+ # having issues with the date scale
+  geom_point(aes(y = wrf_pm, colour = 'WRF-Chem'), size = 0.75) + 
+  geom_point(aes(y = geo_wt_pm, colour = 'Geo-Weight'), size = 0.75) +
+  # custom colour
+  scale_colour_manual(name='Method', values= c("red", "blue")) +
+  facet_wrap(~county) + 
+  ggtitle(expression('Washington Counties PM2.5 µg/m'^3, ' by Date')) +
+  ylab(expression('Population-Weighted PM2.5 µg/m'^3)) +
+  xlab('Month in 2012') + 
+  theme(panel.background = element_rect(fill = 'white', colour = 'black'),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.title.y = element_text(angle = 90),
+    axis.title.y = element_text(angle = 90),
+    # facet themes
+    strip.background = element_rect(fill = 'white')) 
+```
+
+## Population-Weighted PM~2.5~ Assigned by Zip Code
+
+### Time-Stratified Case-Crossover (referent period same day of the week within the same month)
 
 The original time-stratified case-crossover design suggested picking referent periods based on any potential time-varying confounding, *a priori*. For example, if day of the week and the month of the exposure sequence is of concern, one might pick referents in the same day of the week and the same day of the month. The papers that discuss and support the use of a time-stratified design are the Janes et al. 2005 **Epidemiology paper**, *Case-Crossover Analyses of Air Pollution Exposure Data; Referent Selection Strategies and Their Implication for Bias*.
 
@@ -117,7 +146,9 @@ The authors state that with the time-stratified design, the *a priori* selection
 More referent periods is better for statistical efficiency, but there is a tradeoff, where additional referent periods may introduce what they call 'overlap bias', which they mathmatically define in Janes 2005 **Statistics in Medicine** paper, *Overlap Bias in the Case-Crossover Design, with Applications to Air Pollution Exposures*. Basically this bias occurs when the exposure assigned in the referent period is conditional on the strategy used to define the referent period.
 
 As Janes et al. state in their 2005 **Statistics in Medicine** paper:
-> *Two of the main strengths of the case-crossover design in the air pollution context are
+
+
+  > *Two of the main strengths of the case-crossover design in the air pollution context are
 that it controls fixed confounders and allows for control over time-dependent confounders
 by design. Choosing referents that are restricted to the same day of the week and season
 as the index time will control for these effects. Though we have not examined the degree
@@ -126,6 +157,7 @@ are clear. Referents that are closer to the index time will achieve greater cont
 confounding. However, sampling referents closer to the index time will also result in a loss
 of power due to less heterogeneity in the exposure series, and a smaller number of referents
 will also result in lower power.*
+
 
 I will use both Janes 2005 papers in **Epidemiology** and **Statistics in Medicine** to justify the use of the time-stratified design.
 
@@ -316,11 +348,11 @@ combined_point_est_df$p_val <- as.numeric(combined_point_est_df$p_val)
 
 ```
 
-### Result Summary: Time-Stratified Case-Crossover Design (same day of week within the month)
+#### Result Summary: Time-Stratified Case-Crossover Design (same day of week within the month)
 
 With this method, the only significant result is with WRF-Chem smoke and asthma.There might be some marginally significant results, however I think the major issue is it's power challenged. More importnatly, exposure series of wildfire smoke is very difficult to define referent period. Although this time-stratified referent of same week days within the month strategy may work well for air pollution, I think a problem persists with the extreme variability in PM~2.5~ due to smoke, where this short time window may still pick up high smoke days when the subject is not necissarily at risk. The major goal is to accounty for time-varying confounding, such as season. So perhaps a referent strategy for the time-stratified design is same days within the week, within the wildfire season (or perhaps the season of spring, summer, fall). I think a good arguement could be made for this.
 
-## Time-Stratified Case-Crossover (referents same day of week within summer or fall season)
+### Time-Stratified Case-Crossover (referents same day of week within summer or fall season)
 
 This variation selects referent periods on the same day as the index date of the case, within the same season (summer or fall). Benefit to this over just month is it provides more referent periods to average, which likely 'smooths' out any major bumps in the PM~2.5~ distribution due to some of the extreme variablity of wildfire smoke PM~2.5~ that may occur either before or after the index day.
 
@@ -508,15 +540,15 @@ combined_point_est_df$p_val <- as.numeric(combined_point_est_df$p_val)
 
 ```
 
-### Result Summary: Time-Stratified Case-Crossover Design (same day of week within the season)
+#### Result Summary: Time-Stratified Case-Crossover Design (same day of week within the season)
 
 For these results, we see that all exposure methods are significantly associated with an increase in all respiratory outcomes and asthma. The WRF-Chem smoke method is associated with cerebrovascular disease as well. As for the other models, Kriging, Global Regression, and Geo-Weighted Regression, those are associated with COPD. 
 
 A general interpretation is as follows:
-A 10 \mu g/m^3^ increase in PM~2.5~ attributed to wildfire smoke was associated with a X% increase in the risk for a health event. Where X% is the odds ratio - 1 (e.g. OR of 1.20 - 1 = 20% increase). 
+A 10 $\mu$g/m^3^ increase in PM~2.5~ attributed to wildfire smoke was associated with a X% increase in the risk for a health event. Where X% is the odds ratio - 1 (e.g. OR of 1.20 - 1 = 20% increase). 
 Note that the odds ratio approximates the relative risk in this case due to the rare outcome assumption in that the calcuation for an odds ratio is similar to risk ratio calcuation.
 
-## Time-Stratified Case-Crossover (referents same day of week within fire season July - October)
+### Time-Stratified Case-Crossover (referents same day of week within fire season July - October)
 
 Similar to the last seasonal example, this time-stratified referent strategy allows even more referent observations to average to 'smooth' out some of those extreme PM~2.5~ concentrations in some referent periods.
 
@@ -697,16 +729,392 @@ combined_point_est_df$p_val <- as.numeric(combined_point_est_df$p_val)
 
 ```
 
-### Result Summary: Time-Stratified Case-Crossover Design (same day of week within the season)
+#### Result Summary: Time-Stratified Case-Crossover Design (same day of week within the season)
 
 Like the results within season, these results within the entire wildfire season were more or less the same. We see that all exposure methods are significantly associated with an increase in all respiratory outcomes and asthma. The WRF-Chem smoke method is associated with cerebrovascular disease as well. As for the other models, Kriging, Global Regression, and Geo-Weighted Regression, those are associated with COPD. I believe this is the most justifiable design approach that would average any extreme values of PM~2.5~ across the wildfire season for the vector of referent values for a particular subject.
 
-## Overall Summary of Time-Stratified Results
+## Overall Summary of Time-Stratified Results (Zip Code-Level)
 
 In some of my other documents, I tried different referent selection schemes for the case-crossover design, specifically the symmetric bi-directional design, where referent periods were matched to the same day of the week. In some cases, this produced similar estimates to the time-stratified results within season and wildfire season presented herein. However, as demonstrated in the Janes 2005 **Statistics in Medicine** paper, the symmetric bi-directional still has a bias in that the \beta is not necissarily unbiased, and can be a slight overestimation (which is evident in these results compared to some of my other results using that design). 
 
 
+## County-Level Exposure
 
-#### To do
-1. Appropriately defining the referent period is important before we can publish this.
-2. Try a time-series study to see if we can produce results that converge between the two designs.
+A second health paper will be paired with CDC mortality data (thanks to Rish). One big difference is that the finest spatial resolution available is county. I have rerun the morbidity analyses using county-level population-weighted PM~2.5~. I think an additional benefit is that I have enough events in each county to run a time-series study, analyzed via poisson regression. This is a good check as the time-series and time-stratfied designs should produce nearly identical results (given certain assumptions).
+
+### Time-Stratified Case-Crossover for the Fire Season using County-Level Exposure 
+
+The following talbe is similar to the previous time-stratified case-crossover within the fire season, except instead of using PM~2.5~ at the zip code level, I used population-weighted county-level PM~2.5~. 
+
+```{r time stratified design county within fire season, echo = F, results='asis'} 
+# note above, results = 'asis' needed to print htmlTables
+
+# I removed copd exacerbation and rheuamtoid arthritis
+
+# dataframe list
+df_list <- list(resp_casecross, asthma_casecross, copd_casecross, pneum_casecross,
+                acute_bronch_casecross, cvd_casecross, arrhythmia_casecross,
+                cereb_vas_casecross, hf_casecross, ihd_casecross, mi_casecross, 
+                broken_arm_casecross)
+
+outcome_list <- c('All Respiratory', 'Asthma', 'COPD', 'Pneumonia', 
+                  'Acute Bronchitis', 'Cardiovascular Disease', 'Arrhythmia', 
+                  'Cerebrovascular Disease', 'Heart Failure',
+                  'Ischemic Heart Disease', 'Myocardial Infarction', 'Broken Arm')
+
+# looking only at wrf chem, kriging, and geo-weighted; taking out 'Global Smoke' method
+method_list <- c('WRF-Chem Smoke', 'Kriging Smoke', 'Global Smoke', 'Geo-Weighted Smoke')
+
+# create an empty list to row bind dataframes together
+datalist <- list()
+
+# data wrangling ----
+# Producing conditional logit model estimates loop 
+for(i in 1:length(df_list)){
+
+# dataframe to loop through
+  df_to_loop <- data.frame(df_list[i])
+  # indication of column
+  outcome <- colnames(df_to_loop[3])
+  # outcome name
+  outcome_name <- outcome_list[i]
+
+  # extract covariates from dataframe
+  covariates_df <- df_to_loop[, c(1:16, 94:95, 151:157)]
+  
+  # modified to select county estimates
+  # extract pm values and divide by 10 and ordered by how I want to present in paper
+  #which(colnames(df_to_loop)=="wrf_pbl_county") # code to find column numbers
+  pm_estimates_df <- df_to_loop[, c(86, 93, 91, 92)]/10  # create 10 unit increases
+  
+  # dataframe for analysis creation
+  # bind columns back together 
+  df_analysis <- cbind(covariates_df, pm_estimates_df) %>% 
+    # remove missing pm values
+    filter(!is.na(wrf_smk_pm_county)) %>% 
+    # limit to emergency or urgent care
+    filter(ADM_TYPE == 1 | ADM_TYPE == 2) %>%
+    # the following code makes sure that the counterfactual values retained are 
+    # symetric in that number of obs before = number of obs after
+    mutate(obs_diff_admission = (date - date_admit)/7) 
+    # dataframe is already for the entire fire season, so I don't need to subset anymore
+  
+  # empty df for table
+  table_df <- data.frame()
+  
+  # empty matrix
+  point_estimates <- matrix(nrow = 4, ncol = 9, byrow = T)
+  
+  colnames(point_estimates) <- c('outcome', 'pm_method', 'n', 'n_events', 'odds_ratio', 
+                                 'lower95', 'upper95', 'se', 'p_val')
+  
+  # fill in the outcome name for the dataframe before the loop
+  point_estimates[, 1] <- outcome_name
+
+
+  # second loop to run a model for each pm estimation method
+    for(j in 26:29){
+
+      # variable to model 
+      var_name <- colnames(df_analysis[j])
+
+      # conditional logistic regression model
+      mod <- clogit(outcome ~ df_analysis[[j]] + wrf_temp_county +
+                    strata(PATIENTID), df_analysis)
+      
+      # populate matrix
+      row_n <- j-25
+      
+      point_estimates[row_n, 2] <- method_list[row_n]
+      point_estimates[row_n, 3] <- mod$n
+      point_estimates[row_n, 4] <- mod$nevent
+      # odds ratio
+      point_estimates[row_n, 5] <- round(exp(summary(mod)$coefficient[1,1]), 3)
+
+      # 95% lower bound
+      point_estimates[row_n, 6] <- round(exp((summary(mod)$coefficient[1,1]) -
+                                        1.96*(summary(mod)$coefficient[1,3])), 3)
+      # 95% upper bound
+      point_estimates[row_n, 7] <- round(exp((summary(mod)$coefficient[1,1]) +
+                                        1.96*(summary(mod)$coefficient[1,3])), 3)
+      # standard error
+      point_estimates[row_n, 8] <- round(summary(mod)$coefficient[1,3], 4)
+      # p val
+      point_estimates[row_n, 9] <- round(summary(mod)$coefficient[1,5], 4)
+  
+      # save point estimates as a dataframe
+      point_est_df <- as_data_frame(point_estimates)
+
+    }
+  
+# combine previous values in dataframe that has all outcome/methods comparisons
+datalist[[i]] <- point_est_df
+
+} # end of loop
+
+# combine each outcome dataframe itteration in to a big dataset
+combined_point_est_df <- bind_rows(datalist)
+
+
+# subset columns I want to put in to the table
+table_df <- combined_point_est_df %>% select(2, 3:7) 
+
+
+  tab <- htmlTable(txtRound(table_df, digits = 3, 1:3), 
+           caption = "County-Level: Association between a 10 ug/m^3 in PM2.5 and Health Outcomes",
+           # row group by outcome
+           rgroup = outcome_list,
+           n.rgroup = c(rep(4, 12)), # 4 rows for each method for each outcome
+           # column headers
+           header = c("Method", "Obs.", "Events",
+                      "OR&dagger;", "Lower", "Upper"),
+           # column spanner
+           cgroup = c("", "95% CI"), 
+           n.cgroup = c(4, 2),
+           padding.rgroup = "&nbsp;&nbsp;",
+           css.cell = "padding-left: 0.5em; padding-right: .5em;", # cell space
+           align = "llccccc", # column alignment,
+           tfoot="&dagger; Adjusted for temperature, accounting for subject. Time-stratified: referent periods matched to events on same day of week within July to October fire season."
+            ) # end table
+  
+  print(tab)
+  
+# ggplot of odds ratios, facet wrapped by outcomes -----
+# convert variables from character to either numeric or factor
+# factor preserves the order of the variable
+combined_point_est_df$outcome <- factor(combined_point_est_df$outcome, 
+                                        levels = unique(combined_point_est_df$outcome))
+
+combined_point_est_df$pm_method <- factor(combined_point_est_df$pm_method, 
+                                          levels = unique(combined_point_est_df$pm_method))
+
+combined_point_est_df$n <- as.numeric(combined_point_est_df$n)
+combined_point_est_df$n_events <- as.numeric(combined_point_est_df$n_events)
+combined_point_est_df$odds_ratio <- as.numeric(combined_point_est_df$odds_ratio)
+combined_point_est_df$lower95 <- as.numeric(combined_point_est_df$lower95)
+combined_point_est_df$upper95 <- as.numeric(combined_point_est_df$upper95)
+combined_point_est_df$se <- as.numeric(combined_point_est_df$se)
+combined_point_est_df$p_val <- as.numeric(combined_point_est_df$p_val)
+
+## ggplot
+  print_plot <- ggplot(combined_point_est_df, 
+                       aes(x = pm_method, y = odds_ratio, colour = pm_method)) +
+    geom_point() + #geom_text(vjust = 0, nudge_x = 0.3) +
+    geom_errorbar(aes(ymin=lower95, ymax=upper95), width = 0.2) +
+    facet_wrap(~outcome, nrow = 3) +
+    geom_hline(yintercept = 1, linetype=2) +
+    ggtitle('County-Level: Association Between PM2.5 \n from Wildfire Smoke on Hospitalizations') +
+    ylab('Odds Ratio for 10µg/m^3 Increase in PM2.5') +
+    xlab('Time-Stratified Within July to October Fire Season') +
+    scale_colour_discrete(name= "Smoke Method") +
+    theme(panel.background = element_rect(fill = 'white', colour = 'black'),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.title.y = element_text(angle = 90),
+    axis.text.x = element_blank(),
+    axis.title.y = element_text(angle = 90),
+    # facet text size
+    strip.text = element_text(size = 7),
+    legend.text = element_text(size = 7)) 
+
+  print(print_plot)
+
+```
+
+County-level results are nearly identical to results when using the zip code-level results. That's pretty cool and reassuring. I think the population-weighting must reduce exposure misclassification to a good degree, weighting PM~2.5~ values more heavily to where most people live.
+
+### County-Level Time-Series for the Fire Season 
+
+The analyses I used were a generalized mixed model, where the dependent variable was the daily outcome counts, regressed on continuous PM~2.5~, assuming a linear relationship (this assumption will be explored in later analyses). The models are adjusted for daily temperature (Kelvin), and day of the week, which I found didn't add much to base models, but I adjusted for as this is a common adjustment in other epi studies. I also treated county as a random intercept, allowing it to vary county to county. Note that the random effects model produces almost identical regression estimates for smoke as if county was adjusted for as a fixed effect.
+
+The results can be interpreted as you would a risk ratio or odds ratio from the time-stratified case-cross over design.
+
+```{r time series rando effect, echo = F, warning= F, results='asis'} 
+
+# load time series dataframe
+wash_ts_df <- read_csv(paste(path, "wa_2012_county_time_series.csv", sep="/"))
+
+# analysis dataframe
+wash_jul_oct_df <- wash_ts_df %>% 
+  # restricting points
+  filter(date >= "2012-07-01" & date <= "2012-10-31") %>% 
+  # exclude 'Unknown' and 'not_wa_residence'
+  filter(county != "not_wa_residence" & county != "Unknown") %>% 
+  # create day of the week variable
+  mutate(day = as.factor(weekdays(date))) %>% 
+  # set missing outcome values to 0 since missing indicates no ER or urgent care 
+  # visits on that date (which is reasonable in sparsely populated counties)
+  mutate_each(funs(wo_miss = ifelse(is.na(.), 0, .)), n_obs:ra_n) %>% 
+  # create a binary smoke indicator variable based smk variables >5, >10, and >15 units 
+  mutate(wrf_smk5 = ifelse(wrf_smk_pm >= 5, 1, 0), 
+         wrf_smk10 = ifelse(wrf_smk_pm >= 10, 1, 0),
+         wrf_smk15 = ifelse(wrf_smk_pm >= 15, 1, 0), 
+         geo_smk5 = ifelse(geo_smk_pm >= 5, 1, 0),
+         geo_smk10 = ifelse(geo_smk_pm >= 10, 1, 0),
+         geo_smk15 = ifelse(geo_smk_pm >= 15, 1, 0),
+         krig_smk5 = ifelse(krig_smk_pm >= 5, 1, 0),
+         krig_smk10 = ifelse(krig_smk_pm >= 10, 1, 0),
+         krig_smk15 = ifelse(krig_smk_pm >= 15, 1, 0), 
+         season = ifelse(date >= "2012-06-22" &  date <= "2012-09-22", "summer",
+                  ifelse(date >= "2012-09-23" & date <= "2012-12-21", "fall",
+                          "other"))) %>% 
+  # rescale pm variables to 10 units
+  mutate_each(funs(unit10 = ./10), wrf_pm:krig_smk_pm) %>% 
+  select(1:2, 31:33, 36, 34:35, 38:44, 28:29, 30, 55, 58, 
+         65, 64, 63) # subset and order variables used in analysis
+
+
+# outcomes to loop through
+outcome_list <- c('All ER or Urgent', 'All Respiratory', 'Asthma', 'COPD', 
+                  'Pneumonia', 'Acute Bronchitis', 'Cardiovascular Disease',
+                  'Arrhythmia', 'Cerebrovascular Disease', 'Heart Failure', 
+                  'Ischemic Heart Disease', 'Myocardial Infarction',
+                  'Broken Arm')
+
+# looking only at wrf chem, kriging, and geo-weighted; taking out 'Global Smoke' method
+method_list <- c('WRF-Chem Smoke', 'Kriging Smoke', 'Global Smoke', 'Geo-Weighted Smoke')
+
+# create an empty list to row bind dataframes together
+datalist <- list()
+
+#glimpse(wash_jul_oct_df)
+# finding columns to retain
+#which(colnames(wash_jul_oct_df)=='geo_smk_pm_unit10')
+#summary(wash_jul_oct_df)
+# loop through outcomes
+for(i in 3:15){
+
+  # empty matrix for table
+  point_estimates <- matrix(nrow = 4, ncol = 5, byrow = T)
+  
+  colnames(point_estimates) <- c('outcome', 'pm_method', 'risk_ratio', 
+                               'lower95', 'upper95')
+
+  # variable to model 
+  outcome_name <- outcome_list[i-2]
+  # fill outcome name
+  point_estimates[, 1] <- outcome_name
+  
+  # loop through pm estimation methods
+  for(j in 20:23){
+
+  var_name <- method_list[j-19]
+  
+  # random effects model where county is treated as a random intercept 
+  mixed_mod_adj <- glmer(wash_jul_oct_df[[i]] ~ wash_jul_oct_df[[j]] + day + season +
+                         wrf_temp + (1|county), wash_jul_oct_df, family = "poisson")
+  
+  model_df <-tidy(mixed_mod_adj)
+  
+  # populate matrix
+  row_n <- j-19
+  # method
+  point_estimates[row_n, 2] <- var_name
+  # rate ratio
+  point_estimates[row_n, 3] <- round(exp(model_df[2,2]), 3)
+  # 95% lower bound
+  point_estimates[row_n, 4] <- round(exp((model_df[2,2]) -
+                                    1.96*(model_df[2,3])), 3)
+  # 95% upper bound
+  point_estimates[row_n, 5] <- round(exp((model_df[2,2]) +
+                                    1.96*(model_df[2,3])), 3)
+  
+  # save point estimates as a dataframe
+  point_est_df <- as_data_frame(point_estimates)
+
+  } # end methods loop
+
+    # combine previous values in dataframe that has all outcome/methods comparisons
+  datalist[[i]] <- point_est_df
+
+} # end outcome loop
+
+# combine each outcome dataframe itteration in to a big dataset
+combined_point_est_df <- bind_rows(datalist)  
+
+
+# subset columns I want to put in to the table
+table_df <- combined_point_est_df %>% select(2:5) 
+
+
+  tab <- htmlTable(txtRound(table_df, digits = 3, 1:3), 
+           caption = paste0("County-Level Time-Series: Association between",
+                            " a 10 ug/m^3 in PM2.5 and Health Outcomes"),
+           # row group by outcome
+           rgroup = outcome_list,
+           n.rgroup = c(rep(4, 12)), # 4 rows for each method for each outcome
+           # column headers
+           header = c("Method", "RR&dagger;", "Lower", "Upper"),
+           # column spanner
+           cgroup = c("", "95% CI"), 
+           n.cgroup = c(2, 2),
+           padding.rgroup = "&nbsp;&nbsp;",
+           css.cell = "padding-left: 0.5em; padding-right: .5em;", # cell space
+           align = "llccccc", # column alignment,
+           tfoot="&dagger; Adjusted for temperature, day of the week, and season."
+            ) # end table
+  
+  print(tab)
+  
+# ggplot of odds ratios, facet wrapped by outcomes -----
+# convert variables from character to either numeric or factor
+# factor preserves the order of the variable
+combined_point_est_df$outcome <- factor(combined_point_est_df$outcome, 
+                                        levels = unique(combined_point_est_df$outcome))
+
+combined_point_est_df$pm_method <- factor(combined_point_est_df$pm_method, 
+                                          levels = unique(combined_point_est_df$pm_method))
+
+
+combined_point_est_df$risk_ratio <- as.numeric(combined_point_est_df$risk_ratio)
+combined_point_est_df$lower95 <- as.numeric(combined_point_est_df$lower95)
+combined_point_est_df$upper95 <- as.numeric(combined_point_est_df$upper95)
+
+## ggplot
+  print_plot <- ggplot(combined_point_est_df, 
+                       aes(x = pm_method, y = risk_ratio, colour = pm_method)) +
+    geom_point() + #geom_text(vjust = 0, nudge_x = 0.3) +
+    geom_errorbar(aes(ymin=lower95, ymax=upper95), width = 0.2) +
+    facet_wrap(~outcome, nrow = 3) +
+    geom_hline(yintercept = 1, linetype=2) +
+    ggtitle('County-Level Time-Series: \n Association Between PM2.5 from \n Wildfire Smoke on Hospitalizations') +
+    ylab('Risk Ratio for 10µg/m^3 Increase in PM2.5') +
+    xlab('Time-Stratified Within July to October Fire Season') +
+    scale_colour_discrete(name= "Smoke Method") +
+    theme(panel.background = element_rect(fill = 'white', colour = 'black'),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.title.y = element_text(angle = 90),
+    axis.text.x = element_blank(),
+    axis.title.y = element_text(angle = 90),
+    # facet text size
+    strip.text = element_text(size = 7),
+    legend.text = element_text(size = 7)) 
+
+  print(print_plot)
+  
+
+```
+
+### Time-Series Results (County)
+
+The tables contain the risk ratio estimates for the association between a linear increase in wildfire smoke PM~2.5~ and the health outcomes of interest. Using asthma as our example, we'd conclude that between July and October in 2012, a 10 unit increase wildfire smoke PM~2.5~, the risk for asthma increased by ~9% to ~13%, depending on the smoke estimate used. All smoke estimation methods were statistically significant for asthma. 
+
+
+### Some Thoughts...
+
+1. Can I do a time-series study at the zip level? Could be very small sample sizes for each zip and perhaps not enough variability.
+2. Is a subtraction of baseline values off a particular exposure method good enough to justify PM~2.5~ due to smoke?
+
+### To Do:
+
+1. Stratified estimates by age category and sex.
+2. Lag effects.
+3. Compare zip vs county assignment of PM~2.5~
+4. Get Rish population-weighted estimates by county with FIPS codes.
+
+### Recommendations for Rish:
+
+1. Run time-series poisson model.
+2. Run time-stratified case-crossover design using all available referent periods within the July 1st to October 31st timeframe for each subject. 
+
