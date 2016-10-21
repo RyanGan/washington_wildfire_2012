@@ -181,7 +181,7 @@ county_pop_vector <- as.vector(county_pop_matrix)
 grid_population_vector <- as.vector(pop_grid_matrix)
 tail(grid_population_vector)
 
-# output zipcode column from zip_grid_proportion for naming purposes later
+# output county column from county_grid_proportion for naming purposes later
 county <- county_grid_proportion[,1]
 head(county)
 
@@ -212,9 +212,6 @@ dim(pm_matrix) # 1107 (pm val in wrf_grid) by 123 (days) matrix
 # Multiply the matrix of county_grid proportion by the PM concentration matrix
 # This matrix contains the summed PM2.5 concentrations for each county code for
 # each day
-county_grid_wt_pm_matrix <- county_grid_matrix %*% pm_matrix
-
-dim(county_grid_wt_pm_matrix) # 595 x 123 matrix (595 countycodes by 123 days)
 
 # multiply the population vector by the pm concentration matrix for each day
 # (column in the matrix)
@@ -318,16 +315,33 @@ for(k in 1:length(tidy_loop)){
 summary(wash_county_pm_pop_wt_2012) 
 head(wash_county_pm_pop_wt_2012)
 
-# I need the County FIPS codes; joining with dataset
+# Join in County FIPS codes with final dataset ---------------------------------
+# County FIPS codes for Rish
+getwd() # check WD, can use a relative path on my pc
+# infile fips codes (I mispelled as fps)
+county_fips <- read_csv('./wa_county.csv') %>% 
+  rename(county = wa_county_name, fips = wa_county_fps) # rename variables
 
-df_check <- wash_county_pm_pop_wt_2012 %>% 
+head(county_fips)
+
+# merge in fips codes
+wash_county_pm_pop_wt_2012_w_fips <- county_fips %>% 
+  full_join(wash_county_pm_pop_wt_2012, by = 'county') 
+
+
+summary(wash_county_pm_pop_wt_2012_w_fips)
+
+
+df_check <- wash_county_pm_pop_wt_2012_w_fips %>% 
   filter(county == 'Chelan' & date == '2012-09-21')
 df_check
 
-write_path <- paste0('./county_population_weighted_pm/wa_county_pop_wt_pm.csv')
-write_csv(wash_county_pm_pop_wt_2012, write_path)
+# Write permanent dataframe ----------------------------------------------------
 
-# looks good; write premanent file to merge with health data
+write_path <- paste0('./wa_county_pop_wt_pm.csv')
+write_csv(wash_county_pm_pop_wt_2012_w_fips, write_path)
+
+
 
 
 
