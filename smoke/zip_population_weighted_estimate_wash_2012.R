@@ -12,9 +12,7 @@
 #              need to be submitted in batches
 
 # load libraries ---------------------------------------------------------------
-library(dplyr) # data manipulation package 
-library(tidyr)
-library(readr)
+library(tidyverse)
 
 
 # Setting Working Directory ----------------------------------------------------
@@ -22,7 +20,7 @@ library(readr)
 #               "smoke_data/created_pm_estimates")
 
 # relative path 
-dir <- paste0("./washington/smoke")
+dir <- paste0("./smoke")
 setwd(dir)
 getwd()
 list.files()
@@ -211,9 +209,12 @@ dim(pm_matrix) # 1107 (pm val in wrf_grid) by 123 (days) matrix
 # Multiply the matrix of zip_grid proportion by the PM concentration matrix
 # This matrix contains the summed PM2.5 concentrations for each zip code for
 # each day
-zip_grid_wt_pm_matrix <- zip_grid_matrix %*% pm_matrix
 
-dim(zip_grid_wt_pm_matrix) # 595 x 123 matrix (595 zipcodes by 123 days)
+# Check -----
+# is this redundant, and should it be removed? I overwrite below
+#zip_grid_wt_pm_matrix <- zip_grid_matrix %*% pm_matrix
+
+#dim(zip_grid_wt_pm_matrix) # 595 x 123 matrix (595 zipcodes by 123 days)
 
 # multiply the population vector by the pm concentration matrix for each day
 # (column in the matrix)
