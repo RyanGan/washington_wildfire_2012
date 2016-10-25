@@ -147,6 +147,18 @@ Here is a figure of the days from July 1st to October 31st 2012 where PM~2.5~ ex
 
 ```{r smoke map, echo = F }
 
+glimpse(zip_pm)
+zip_smoke_days <- zip_pm %>% 
+  # create binary indicators of days with smoke
+  mutate(wrf_smoke = if_else(wrf_smk_pm > 0, 1, 0),
+         wrf_smoke5 = if_else(wrf_smk_pm > 5, 1, 0),
+         wrf_smoke10 = if_else(wrf_smk_pm > 10, 1, 0),
+         geo_smoke = if_else(geo_smk_pm > 0, 1, 0),
+         geo_smoke5 = if_else(geo_smk_pm > 5, 1, 0),
+         geo_smoke10 = if_else(geo_smk_pm > 10, 1, 0)) %>% 
+  group_by(ZIPCODE) %>% 
+  summarise()
+
 # ggmap and rgdal needed
 # Set base map boundary layer
 bbox <- c(-125, 45, -116.1, 50)
@@ -184,8 +196,10 @@ wash_zip_map <- us_zip_2012[us_zip_2012$ZCTA5CE10 %in% chars_zip_2012$ZIPCODE,]
 
 # county smoke days by washington county
 proj4string(wash_zip_map)
-# set coord ref system to WGS84
+# set coord ref system to WGS84 to match projections of ggmap
 wash_zip_map <- spTransform(wash_zip_map, "+proj=longlat +datum=WGS84")
+
+
 
 
 ggmap(washington_map) + 
