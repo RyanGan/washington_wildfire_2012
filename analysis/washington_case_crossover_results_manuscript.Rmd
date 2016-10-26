@@ -16,6 +16,8 @@ library(broom) # broom for tidy data from stats models
 # spatial packages
 library(ggmap) # map package
 library(rgdal) # set coord ref system for shape files
+library(rgeos) # need it when converting shape to dataframe
+library(maptools) # convert shape to dataframe
 
 ```
 
@@ -100,6 +102,10 @@ county_pm <- read_csv(paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/"
 zip_pm <- read_csv(paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
               "wildfire_washington/smoke/pm_data/zip_pm_to_merge_with_chars.csv"))
 
+# read locations of fires
+fire_loc <- read_csv(paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
+              "wildfire_washington/smoke/pm_data/washington_fires_locations201209.csv"))
+
 ```
 
 ## Methods Description
@@ -147,7 +153,9 @@ Here is a figure of the days from July 1st to October 31st 2012 where PM~2.5~ ex
 
 ```{r smoke map, echo = F }
 
-glimpse(zip_pm)
+# fire location has a weird date format, but I think is only september
+
+# zip code count of smoke ------------------------------------------------------
 zip_smoke_days <- zip_pm %>% 
   # create binary indicators of days with smoke
   mutate(wrf_smoke = if_else(wrf_smk_pm > 0, 1, 0),
@@ -157,7 +165,17 @@ zip_smoke_days <- zip_pm %>%
          geo_smoke5 = if_else(geo_smk_pm > 5, 1, 0),
          geo_smoke10 = if_else(geo_smk_pm > 10, 1, 0)) %>% 
   group_by(ZIPCODE) %>% 
-  summarise()
+  summarise(wrf_smk_days = sum(wrf_smoke), wrf_smk5_days = sum(wrf_smoke5), 
+            wrf_smk10_days = sum(wrf_smoke10), geo_smk_days = sum(geo_smoke), 
+            geo_smk_days = sum(geo_smoke), geo_smk5_days = sum(geo_smoke5),
+            geo_smk10_days = sum(geo_smoke10)) %>% 
+  # change zipcode to character
+  mutate(ZIPCODE = as.character(ZIPCODE))
+
+# check smoke days
+#summary(zip_smoke_days)
+
+# maps  -----------------------------------------------------------------------
 
 # ggmap and rgdal needed
 # Set base map boundary layer
@@ -165,10 +183,12 @@ bbox <- c(-125, 45, -116.1, 50)
 
 # call black and white map
 washington_map <- get_map(location= bbox, source = 'stamen',
-                          maptype = 'toner', crop = TRUE)
-# call terrain map
-wash_map_gterrain <- get_map(location = bbox, source = 'google',
-                             maptype = 'terrain', crop = T)
+                          maptype = 'toner', crop = T)
+
+
+# call google terrain map
+#wash_map_terrain <- get_map(location = "washington state", source = 'google',
+#                             maptype = 'terrain', crop = F)
 
 # get washington county boundaries
 counties <- map_data("county")
@@ -194,20 +214,94 @@ chars_zip_2012 <- read.csv(zip_file) %>%
 # subset shapefile
 wash_zip_map <- us_zip_2012[us_zip_2012$ZCTA5CE10 %in% chars_zip_2012$ZIPCODE,]
 
-# county smoke days by washington county
-proj4string(wash_zip_map)
+# check projection
+# proj4string(wash_zip_map)
 # set coord ref system to WGS84 to match projections of ggmap
 wash_zip_map <- spTransform(wash_zip_map, "+proj=longlat +datum=WGS84")
 
 
+# fortify washington shape data in to dataframe (need maptools package)
+wash_zip_df <- tidy(wash_zip_map, region = "ZCTA5CE10") %>% 
+  # merge in smoke days
+  full_join(zip_smoke_days, by = c("id" = "ZIPCODE"))
 
+# summary(wash_zip_df)
 
 ggmap(washington_map) + 
-  geom_polygon(data = wash_zip_map, aes(x=long, y=lat, group = group), fill = NA, colour = 'red')
+  geom_polygon(data = wash_zip_df, 
+    aes(x=long, y=lat, group = group, fill = geo_smk_days), alpha = 0.6) +
+  scale_fill_gradient(expression("Number of \nSmoke Days"),
+    low = 'white', high = 'black') +
+  geom_point(data = fire_loc, aes(x = Longitude, y = Latitude, shape = "Fire Locations"), 
+             colour = "red") +
+  scale_shape_manual(values = 24) +
+  ggtitle("Days where geo smoke PM2.5 > 0 for \nzip codes from July 1st to October 31st") + 
+  theme(axis.text.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks=element_blank(),
+        axis.title.x=element_blank(),
+        axis.title.y=element_blank())
 
 ```
 
 ## Population-Weighted PM~2.5~ Assigned by Zip Code
+
+### Descriptives
+
+```{r descriptive, echo = F}
+
+# dataframe list
+df_list <- list(resp_casecross, asthma_casecross, copd_casecross, pneum_casecross,
+                acute_bronch_casecross, cvd_casecross, arrhythmia_casecross,
+                cereb_vas_casecross, hf_casecross, ihd_casecross, mi_casecross, 
+                broken_arm_casecross)
+
+outcome_list <- c('All Respiratory', 'Asthma', 'COPD', 'Pneumonia', 
+                  'Acute Bronchitis', 'Cardiovascular Disease', 'Arrhythmia', 
+                  'Cerebrovascular Disease', 'Heart Failure',
+                  'Ischemic Heart Disease', 'Myocardial Infarction', 'Broken Arm')
+
+# set list and do cross tabs to find values
+# Producing conditional logit model estimates loop 
+for(i in 1:length(df_list)){
+
+# dataframe to loop through
+  df_to_loop <- data.frame(df_list[i])
+  # indication of column
+  outcome <- colnames(df_to_loop[3])
+  # outcome name
+  outcome_name <- outcome_list[i]
+
+  # extract covariates from dataframe
+  covariates_df <- df_to_loop[, c(1:16, 27:28, 151:155)]
+  
+  # extract pm values and divide by 10 and ordered
+  #which(colnames(df_to_loop)=="global_smk_pm_zip") # code to find column numbers
+  pm_estimates_df <- df_to_loop[, c(19, 26, 25, 24)]/10  # create 10 unit increases
+  
+  # dataframe for analysis creation
+  # bind columns back together 
+  df_analysis <- cbind(covariates_df, pm_estimates_df) %>% 
+    # remove missing pm values
+    filter(!is.na(wrf_smk_pm_zip)) %>% 
+    # limit to emergency or urgent care
+    filter(ADM_TYPE == 1 | ADM_TYPE == 2) %>%
+    # the following code makes sure that the counterfactual values retained are 
+    # symetric in that number of obs before = number of obs after
+    mutate(obs_diff_admission = (date - date_admit)/7) %>% 
+      group_by(PATIENTID) %>% 
+      # identifies the min and max observations, and sets it to the minimum n of obs
+      mutate(min_obs_diff = abs(min(obs_diff_admission)),
+             max_obs_diff = abs(max(obs_diff_admission)),
+             obs_limit = min(c(min_obs_diff, max_obs_diff)),
+             keep_obs = ifelse(month_admit == month_smk, 1, 0))%>% 
+      filter(keep_obs == 1)
+
+  # empty df for table
+  table_df <- data.frame()
+}
+
+```
 
 ### Time-Stratified Case-Crossover (referent period same day of the week within the same month)
 
@@ -240,6 +334,7 @@ I will use both Janes 2005 papers in **Epidemiology** and **Statistics in Medici
 The time-dependent confounders have been what I'm struggling with, as the variation of wildfire smoke depends on a variety of factors, including season. I present a three different scenarios which can be justified in a paper: within month, within season, and within wildfire season.
 
 This design has an advantage over other case-crossover designs I've explored in that you can use more referent times, and as the exposure at these times are averaged for each subject over a set time period, this balances out some of the more extreme values of PM~2.5~ that may persist over a couple weeks due to wildfire smoke. 
+
 
 ```{r time stratified design within month, echo = F, results='asis'} 
 # note above, results = 'asis' needed to print htmlTables
