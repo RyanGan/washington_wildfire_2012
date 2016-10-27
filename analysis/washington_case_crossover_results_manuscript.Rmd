@@ -248,7 +248,7 @@ ggmap(washington_map) +
 
 ### Descriptives
 
-```{r descriptive, echo = F}
+```{r descriptive table, echo = F}
 
 # dataframe list
 df_list <- list(resp_casecross, asthma_casecross, copd_casecross, pneum_casecross,
@@ -261,6 +261,9 @@ outcome_list <- c('All Respiratory', 'Asthma', 'COPD', 'Pneumonia',
                   'Cerebrovascular Disease', 'Heart Failure',
                   'Ischemic Heart Disease', 'Myocardial Infarction', 'Broken Arm')
 
+# create an empty list to row bind dataframes together
+datalist <- list()
+
 # set list and do cross tabs to find values
 # Producing conditional logit model estimates loop 
 for(i in 1:length(df_list)){
@@ -272,34 +275,70 @@ for(i in 1:length(df_list)){
   # outcome name
   outcome_name <- outcome_list[i]
 
-  # extract covariates from dataframe
-  covariates_df <- df_to_loop[, c(1:16, 27:28, 151:155)]
-  
-  # extract pm values and divide by 10 and ordered
-  #which(colnames(df_to_loop)=="global_smk_pm_zip") # code to find column numbers
-  pm_estimates_df <- df_to_loop[, c(19, 26, 25, 24)]/10  # create 10 unit increases
-  
   # dataframe for analysis creation
   # bind columns back together 
-  df_analysis <- cbind(covariates_df, pm_estimates_df) %>% 
-    # remove missing pm values
+  df_analysis <- df_to_loop %>% select(c(1:16, 19, 27:28, 151:155)) %>% 
+    # only look at outcomes
+    filter(outcome == 1) %>%
+    # left in only observations with estimates of smoke
     filter(!is.na(wrf_smk_pm_zip)) %>% 
     # limit to emergency or urgent care
-    filter(ADM_TYPE == 1 | ADM_TYPE == 2) %>%
-    # the following code makes sure that the counterfactual values retained are 
-    # symetric in that number of obs before = number of obs after
-    mutate(obs_diff_admission = (date - date_admit)/7) %>% 
-      group_by(PATIENTID) %>% 
-      # identifies the min and max observations, and sets it to the minimum n of obs
-      mutate(min_obs_diff = abs(min(obs_diff_admission)),
-             max_obs_diff = abs(max(obs_diff_admission)),
-             obs_limit = min(c(min_obs_diff, max_obs_diff)),
-             keep_obs = ifelse(month_admit == month_smk, 1, 0))%>% 
-      filter(keep_obs == 1)
+    filter(ADM_TYPE == 1 | ADM_TYPE == 2) %>% 
+    # add another row that makes sure there is a person <15 in the dataframe
+    # tricking xtabs to produce a 0 cell for the outcome for age <15
+    add_row(outcome = 0, age_cat = 0)
+  
+  # cross tabs
+  outcome_n <- xtabs(~ outcome, df_analysis)
+  cross_tab_age <- xtabs(~ outcome + age_cat, df_analysis)
+  cross_tab_sex <- xtabs(~ outcome + sex_num, df_analysis)
+  # empty matrix
+  point_estimates <- matrix(nrow = 1, ncol = 7, byrow = T)
+  
+  colnames(point_estimates) <- c("outcome", "n", "age_15", "age_15_65", 
+                                 "age_65", "female", "male")
+  
+  # fill in the outcome name for the dataframe before the loop
+  point_estimates[, 1] <- outcome_name
+  # fill n
+  point_estimates[, 2] <- outcome_n[2] # second element of the 1 dimension vector
+  # age <15
+  point_estimates[, 3] <- cross_tab_age[2, 1]
+  # age 15 to 65
+  point_estimates[, 4] <- cross_tab_age[2, 2]
+  # age >65
+  point_estimates[, 5] <- cross_tab_age[2, 3]
+  # male == 0
+  point_estimates[, 7] <- cross_tab_sex[1, 1]
+  # female == 1
+  point_estimates[, 6] <- cross_tab_sex[1, 2]
 
-  # empty df for table
-  table_df <- data.frame()
-}
+
+  # save point estimates as a dataframe
+  point_est_df <- as_data_frame(point_estimates)
+  
+  # combine previous values in dataframe that has all outcome/methods comparisons
+  datalist[[i]] <- point_est_df
+
+} # end of loop
+
+# combine each outcome dataframe itteration in to a big dataset
+combined_point_est_df <- bind_rows(datalist)
+
+  tab <- htmlTable(txtRound(combined_point_est_df), 
+           caption = "Number of cases for each outcome observed from July 1st to October 31st, 2012",
+           # column headers
+           header = c("Outcome", "Cases n", "<15", "15 to 65", ">65",
+                      "Female", "Male"),
+           # column spanner
+           cgroup = c("","Age Category", "Sex"), 
+           n.cgroup = c(2, 3, 2),
+           padding.rgroup = "&nbsp;&nbsp;",
+           css.cell = "padding-left: 0.5em; padding-right: .5em;", # cell space
+           align = "llccccc" # column alignment,
+            ) # end table
+
+  print(tab)
 
 ```
 
@@ -564,8 +603,6 @@ for(i in 1:length(df_list)){
   outcome <- colnames(df_to_loop[3])
   # outcome name
   outcome_name <- outcome_list[i]
-
- 
 
   # extract covariates from dataframe
   covariates_df <- df_to_loop[, c(1:16, 27:28, 151:157)]
@@ -967,7 +1004,7 @@ for(i in 1:length(df_list)){
 
   # new loop for age categories
   for(k in 0:2){
- 
+
     # empty matrix (12 x 10 matrix)
     point_estimates <- matrix(nrow = 4, ncol = 10, byrow = T)
     
@@ -999,14 +1036,17 @@ for(i in 1:length(df_list)){
 
       # variable to model 
       var_name <- colnames(df_analysis[j])
-
+      
+      # set row number to fill
+      row_n <- j-25
+      
+      # only run the model if the dataframe has observations
+      if(nrow(df_analysis) != 0){
       # conditional logistic regression model
       mod <- clogit(outcome ~ df_analysis[[j]] + wrf_temp_zip +
                     strata(PATIENTID), df_analysis)
       
       # populate matrix
-      row_n <- j-25
-      
       point_estimates[row_n, 3] <- method_list[row_n]
       point_estimates[row_n, 4] <- mod$n
       point_estimates[row_n, 5] <- mod$nevent
@@ -1023,93 +1063,115 @@ for(i in 1:length(df_list)){
       point_estimates[row_n, 9] <- round(summary(mod)$coefficient[1,3], 4)
       # p val
       point_estimates[row_n, 10] <- round(summary(mod)$coefficient[1,5], 4)
-  
-      # save point estimates as a dataframe
-      point_est_df <- as_data_frame(point_estimates)
+      
+      # create else statement that fills matrix with missing so I still have the row
+      # in the final dataframe
+      } else {point_estimates[row_n, 3] <- method_list[row_n]
+              point_estimates[row_n, 4] <- 0
+              point_estimates[row_n, 5] <- 0
+              point_estimates[row_n, c(6:10)] <- 99 } # end 'if else' statement
 
     } # end methods loop
+  
+    # save point estimates as a dataframe
+    point_est_df <- as_data_frame(point_estimates)
     
     # combine previous values in dataframe that has all outcome/methods comparisons
     datalist1[[k+1]] <- point_est_df
   } # end age category loop
 
-  datalist2[[i]] <- datalist1
+  # bind rows of age category estimates together
+ age_est_df <- bind_rows(datalist1)
+ 
+ # populate second dataframe list
+ datalist2[[i]] <- age_est_df
 
 } # end of outcome loop
 
 # combine each outcome dataframe itteration in to a big dataset
-combined_point_est_df <- bind_rows(datalist)
+combined_point_est_df <- bind_rows(datalist2)
+
+geo_smk_est_age <- combined_point_est_df %>% 
+  # filter columns to just geo-smk
+  filter(pm_method == "Geo-Weighted Smoke") %>% 
+  mutate(age_cat2 = ifelse(age_cat == 0, "<15", 
+                    ifelse(age_cat == 1, "15-65",
+                    ifelse(age_cat == 2, ">65", NA)))) %>% 
+  # subset columns I want to put in to the table
+  select(11, 5:8) %>% 
+  mutate(odds_ratio = ifelse(odds_ratio == 99, "--", odds_ratio),
+         lower95 = ifelse(lower95 == 99, "--", lower95),
+         upper95 = ifelse(upper95 == 99, "--", upper95))
 
 
-# subset columns I want to put in to the table
-table_df <- combined_point_est_df %>% select(2, 3:7) 
-
-
-  tab <- htmlTable(txtRound(table_df, digits = 3, 1:3), 
-           caption = "Association between a 10 ug/m^3 in PM2.5 and Health Outcomes",
+  tab <- htmlTable(txtRound(geo_smk_est_age, digits = 3, 1:3), 
+           caption = "Association between a 10 ug/m^3 in PM2.5 geo smoke and health outcomes stratified by age",
            # row group by outcome
            rgroup = outcome_list,
-           n.rgroup = c(rep(4, 12)), # 4 rows for each method for each outcome
+           n.rgroup = c(rep(3, 12)), # 3 rows for each age cat for each outcome
            # column headers
-           header = c("Method", "Obs.", "Events",
+           header = c("Age Group", "Events",
                       "OR&dagger;", "Lower", "Upper"),
            # column spanner
            cgroup = c("", "95% CI"), 
-           n.cgroup = c(4, 2),
+           n.cgroup = c(3, 2),
            padding.rgroup = "&nbsp;&nbsp;",
            css.cell = "padding-left: 0.5em; padding-right: .5em;", # cell space
-           align = "llccccc", # column alignment,
+           align = "lcccccc", # column alignment,
            tfoot="&dagger; Adjusted for temperature, accounting for subject. Time-stratified: referent periods matched to events on same day of week within July to October fire season."
             ) # end table
   
   print(tab)
   
-# ggplot of odds ratios, facet wrapped by outcomes -----
-# convert variables from character to either numeric or factor
-# factor preserves the order of the variable
-combined_point_est_df$outcome <- factor(combined_point_est_df$outcome, 
-                                        levels = unique(combined_point_est_df$outcome))
-
-combined_point_est_df$pm_method <- factor(combined_point_est_df$pm_method, 
-                                          levels = unique(combined_point_est_df$pm_method))
-
-combined_point_est_df$n <- as.numeric(combined_point_est_df$n)
-combined_point_est_df$n_events <- as.numeric(combined_point_est_df$n_events)
-combined_point_est_df$odds_ratio <- as.numeric(combined_point_est_df$odds_ratio)
-combined_point_est_df$lower95 <- as.numeric(combined_point_est_df$lower95)
-combined_point_est_df$upper95 <- as.numeric(combined_point_est_df$upper95)
-combined_point_est_df$se <- as.numeric(combined_point_est_df$se)
-combined_point_est_df$p_val <- as.numeric(combined_point_est_df$p_val)
-
-## ggplot
-  print_plot <- ggplot(combined_point_est_df, 
-                       aes(x = pm_method, y = odds_ratio, colour = pm_method)) +
-    geom_point() + #geom_text(vjust = 0, nudge_x = 0.3) +
-    geom_errorbar(aes(ymin=lower95, ymax=upper95), width = 0.2) +
-    facet_wrap(~outcome, nrow = 3) +
-    geom_hline(yintercept = 1, linetype=2) +
-    ggtitle('Association Between PM2.5 from \n Wildfire Smoke on Hospitalizations') +
-    ylab('Odds Ratio for 10µg/m^3 Increase in PM2.5') +
-    xlab('Time-Stratified Within July to October Fire Season') +
-    scale_colour_discrete(name= "Smoke Method") +
-    theme(panel.background = element_rect(fill = 'white', colour = 'black'),
-    panel.grid.major = element_blank(),
-    panel.grid.minor = element_blank(),
-    # strip element
-    strip.background = element_rect(colour=NA, fill=NA),
-    panel.border = element_rect(fill = NA, color = "black"),
-    # facet text size
-    strip.text = element_text(size = 7),
-    legend.text = element_text(size = 7),
-    # axis element
-    axis.title.y = element_text(angle = 90),
-    axis.text.x = element_blank(),
-    axis.title.y = element_text(angle = 90))
-
-
-  print(print_plot)
+# Commenting out plot for now
+# # ggplot of odds ratios, facet wrapped by outcomes -----
+# # convert variables from character to either numeric or factor
+# # factor preserves the order of the variable
+# combined_point_est_df$outcome <- factor(combined_point_est_df$outcome, 
+#                                         levels = unique(combined_point_est_df$outcome))
+# 
+# combined_point_est_df$pm_method <- factor(combined_point_est_df$pm_method, 
+#                                           levels = unique(combined_point_est_df$pm_method))
+# 
+# combined_point_est_df$n <- as.numeric(combined_point_est_df$n)
+# combined_point_est_df$n_events <- as.numeric(combined_point_est_df$n_events)
+# combined_point_est_df$odds_ratio <- as.numeric(combined_point_est_df$odds_ratio)
+# combined_point_est_df$lower95 <- as.numeric(combined_point_est_df$lower95)
+# combined_point_est_df$upper95 <- as.numeric(combined_point_est_df$upper95)
+# combined_point_est_df$se <- as.numeric(combined_point_est_df$se)
+# combined_point_est_df$p_val <- as.numeric(combined_point_est_df$p_val)
+# 
+# ## ggplot
+#   print_plot <- ggplot(combined_point_est_df, 
+#                        aes(x = pm_method, y = odds_ratio, colour = pm_method)) +
+#     geom_point() + #geom_text(vjust = 0, nudge_x = 0.3) +
+#     geom_errorbar(aes(ymin=lower95, ymax=upper95), width = 0.2) +
+#     facet_wrap(~outcome, nrow = 3) +
+#     geom_hline(yintercept = 1, linetype=2) +
+#     ggtitle('Association Between PM2.5 from \n Wildfire Smoke on Hospitalizations') +
+#     ylab('Odds Ratio for 10µg/m^3 Increase in PM2.5') +
+#     xlab('Time-Stratified Within July to October Fire Season') +
+#     scale_colour_discrete(name= "Smoke Method") +
+#     theme(panel.background = element_rect(fill = 'white', colour = 'black'),
+#     panel.grid.major = element_blank(),
+#     panel.grid.minor = element_blank(),
+#     # strip element
+#     strip.background = element_rect(colour=NA, fill=NA),
+#     panel.border = element_rect(fill = NA, color = "black"),
+#     # facet text size
+#     strip.text = element_text(size = 7),
+#     legend.text = element_text(size = 7),
+#     # axis element
+#     axis.title.y = element_text(angle = 90),
+#     axis.text.x = element_blank(),
+#     axis.title.y = element_text(angle = 90))
+# 
+# 
+#   print(print_plot)
 
 ```
+
+### Seasonal Time-Stratified by Sex
 
 ### Overall Summary of Time-Stratified Results (Zip Code-Level)
 
