@@ -23,12 +23,12 @@ Note, epidemiological methods that Sheryl and I think can improve our estimation
 ```{r data import, include = F, echo = FALSE}
 # Set working directory and read in files --------------------------------------
 # direct path for mac
-#path <- paste0("/Users/ryangan/Documents/local_git_repo/wildfire_washington/",
-#        "analysis/analysis_data")
-
+path <- paste0("/Users/ryangan/Documents/local_git_repo/wildfire_washington/",
+        "analysis/analysis_data")
+getwd()
 # direct path for pc
-path <- paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
-               "wildfire_washington/analysis/analysis_data")
+#path <- paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
+#               "wildfire_washington/analysis/analysis_data")
 
 # Infile case-crossover dataframes ---------------------------------------------
 # Dataframes made in 'chars_3month_binary_smoke_may2016 script
