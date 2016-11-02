@@ -99,12 +99,12 @@ county_pm <- read_csv(paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/"
             "wildfire_washington/smoke/pm_data/wa_county_pop_wt_pm.csv"))
 
 # read zip pm for counts by zip
-zip_pm <- read_csv(paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
-              "wildfire_washington/smoke/pm_data/zip_pm_to_merge_with_chars.csv"))
+#zip_pm <- read_csv(paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
+#              "wildfire_washington/smoke/pm_data/zip_pm_to_merge_with_chars.csv"))
 
 # read locations of fires
-fire_loc <- read_csv(paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
-              "wildfire_washington/smoke/pm_data/washington_fires_locations201209.csv"))
+#fire_loc <- read_csv(paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
+#              "wildfire_washington/smoke/pm_data/washington_fires_locations201209.csv"))
 
 ```
 
@@ -1450,43 +1450,42 @@ datalist2 <- list()
 # Producing conditional logit model estimates loop 
 for(i in 1:length(df_list)){
 
-  i <- 2
 # dataframe to loop through
   df_to_loop <- data.frame(df_list[i])
   # indication of column
   outcome <- colnames(df_to_loop[3])
   # outcome name
   outcome_name <- outcome_list[i]
-
+  
   # extract covariates from dataframe
   covariates_df <- df_to_loop[, c(1:16, 27,79:83, 28, 151:157)]
   
   # extract pm values and divide by 10 and ordered
-  which(colnames(df_to_loop)=="wrf_temp_lag1_zip") # code to find column numbers
-  which(colnames(df_to_loop)=="wrf_temp_zip") # code to find column numbers
+  #which(colnames(df_to_loop)=="wrf_temp_lag1_zip") # code to find column numbers
+  #which(colnames(df_to_loop)=="wrf_temp_zip") # code to find column numbers
   pm_lag_list <- list(df_to_loop[, c(19, 39:43)]/10, df_to_loop[, c(26, 74:78)]/10,
                   df_to_loop[, c(25, 69:73)]/10, df_to_loop[, c(24, 64:68)]/10)  # create 10 unit increases
 # left off here ---------------
 # need to think if I need a methods section (probably not since this is it)
   
-    glimpse(pm_lag_list)
+  glimpse(pm_lag_list)
   # new loop for each element of the lag list 
-  for(k in pm_lag_list){
+  for(k in 1:4){
 
     # empty matrix (12 x 10 matrix)
-    point_estimates <- matrix(nrow = 4, ncol = 10, byrow = T)
+    point_estimates <- matrix(nrow = 5, ncol = 10, byrow = T)
     
-    colnames(point_estimates) <- c('outcome', 'lag', 'pm_method', 'n', 'n_events', 
+    colnames(point_estimates) <- c('outcome', 'pm_method', 'lag', 'n', 'n_events', 
                                    'odds_ratio', 'lower95', 'upper95', 'se', 'p_val')
     
     # fill in the outcome namedataframe before method loop
     point_estimates[, 1] <- outcome_name
     # repeat the sex category 4 times for each pm method
-    point_estimates[, 2] <- k
-    
+    point_estimates[, 2] <- method_list[k]
+
     # dataframe for analysis creation
     # bind columns back together 
-    df_analysis <- cbind(covariates_df, pm_estimates_df) %>% 
+    df_analysis <- cbind(covariates_df, pm_lag_list[k]) %>% 
       # remove missing pm values
       filter(!is.na(wrf_smk_pm_zip)) %>% 
       # limit to emergency or urgent care
@@ -1497,29 +1496,31 @@ for(i in 1:length(df_list)){
       # symetric in that number of obs before = number of obs after
       mutate(obs_diff_admission = (date - date_admit)/7) 
       # dataframe is already for the entire fire season, so I don't need to subset anymore
-    
+  
+  # loop to run a model for each lag 0-5
+    for(j in 0:5){
+      # finding locations of columns in dataframe
+      #which(colnames(df_analysis)=="wrf_temp_zip")
 
-  # second loop to run a model for each pm estimation method
-    for(j in 26:29){
-
-      # variable to model 
-      var_name <- colnames(df_analysis[j])
-      
+      # set column number to evaluate for the pm lag method
+      pm_lag_colnum <- j + 31
+      # set column number of wrf temp lag to adjust for
+      temp_lag_colnum <- j + 17
       # set row number to fill
-      row_n <- j-25
+      row_n <- j+1
       
       # only run the model if the dataframe has observations
       if(nrow(df_analysis) != 0){
       # conditional logistic regression model
-      mod <- clogit(outcome ~ df_analysis[[j]] + strata(PATIENTID), df_analysis)
-      
+      mod <- clogit(outcome ~ df_analysis[[pm_lag_colnum]] + df_analysis[[temp_lag_colnum]] +
+                      strata(PATIENTID), df_analysis)
+
       # populate matrix
-      point_estimates[row_n, 3] <- method_list[row_n]
+      point_estimates[row_n, 3] <- j
       point_estimates[row_n, 4] <- mod$n
       point_estimates[row_n, 5] <- mod$nevent
       # odds ratio
       point_estimates[row_n, 6] <- round(exp(summary(mod)$coefficient[1,1]), 3)
-
       # 95% lower bound
       point_estimates[row_n, 7] <- round(exp((summary(mod)$coefficient[1,1]) -
                                         1.96*(summary(mod)$coefficient[1,3])), 3)
@@ -1548,10 +1549,10 @@ for(i in 1:length(df_list)){
   } # end sex category loop
 
   # bind rows of sex category estimates together
- sex_est_df <- bind_rows(datalist1)
+ lag_est_df <- bind_rows(datalist1)
  
  # populate second dataframe list
- datalist2[[i]] <- sex_est_df
+ datalist2[[i]] <- lag_est_df
 
 } # end of outcome loop
 
