@@ -30,12 +30,12 @@ Note, epidemiological methods that Sheryl and I think can improve our estimation
 ```{r data import, include = F, echo = FALSE}
 # Set working directory and read in files --------------------------------------
 # direct path for mac
-path <- paste0("/Users/ryangan/Documents/local_git_repo/wildfire_washington/",
-        "analysis/analysis_data")
+#path <- paste0("/Users/ryangan/Documents/local_git_repo/wildfire_washington/",
+#        "analysis/analysis_data")
 getwd()
 # direct path for pc
-#path <- paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
-#               "wildfire_washington/analysis/analysis_data")
+path <- paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
+               "wildfire_washington/analysis/analysis_data")
 
 # Infile case-crossover dataframes ---------------------------------------------
 # Dataframes made in 'chars_3month_binary_smoke_may2016 script
@@ -99,12 +99,12 @@ county_pm <- read_csv(paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/"
             "wildfire_washington/smoke/pm_data/wa_county_pop_wt_pm.csv"))
 
 # read zip pm for counts by zip
-#zip_pm <- read_csv(paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
-#              "wildfire_washington/smoke/pm_data/zip_pm_to_merge_with_chars.csv"))
+zip_pm <- read_csv(paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
+              "wildfire_washington/smoke/pm_data/zip_pm_to_merge_with_chars.csv"))
 
 # read locations of fires
-#fire_loc <- read_csv(paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
-#              "wildfire_washington/smoke/pm_data/washington_fires_locations201209.csv"))
+fire_loc <- read_csv(paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
+              "wildfire_washington/smoke/pm_data/washington_fires_locations201209.csv"))
 
 ```
 
@@ -127,7 +127,7 @@ These figures represented the population-weighted PM~2.5~ for each county for WR
 ```{r pm time series plot, echo = F, results='asis'}
 
 
-ggplot(county_pm, aes(x = date)) + 
+print_plot <-ggplot(county_pm, aes(x = date)) + 
   scale_x_date(date_labels = '%m')+ # having issues with the date scale
   geom_point(aes(y = wrf_pm, colour = 'WRF-Chem'), size = 0.75) + 
   geom_point(aes(y = geo_wt_pm, colour = 'Geo-Weight'), size = 0.75) +
@@ -144,6 +144,8 @@ ggplot(county_pm, aes(x = date)) +
     axis.title.y = element_text(angle = 90),
     # facet themes
     strip.background = element_rect(fill = 'white')) 
+
+print(print_plot)
 ```
 
 
@@ -151,7 +153,7 @@ ggplot(county_pm, aes(x = date)) +
 
 Here is a figure of the days from July 1st to October 31st 2012 where PM~2.5~ exceeded >0, >5, and >10.
 
-```{r smoke map, echo = F }
+```{r smoke map, echo = F, results='asis'}
 
 # fire location has a weird date format, but I think is only september
 
@@ -227,7 +229,7 @@ wash_zip_df <- tidy(wash_zip_map, region = "ZCTA5CE10") %>%
 
 # summary(wash_zip_df)
 
-ggmap(washington_map) + 
+print_map <- ggmap(washington_map) + 
   geom_polygon(data = wash_zip_df, 
     aes(x=long, y=lat, group = group, fill = geo_smk_days), alpha = 0.6) +
   scale_fill_gradient(expression("Number of \nSmoke Days"),
@@ -248,7 +250,7 @@ ggmap(washington_map) +
 
 ### Descriptives
 
-```{r descriptive table, echo = F}
+```{r descriptive table, echo = F, results='asis'}
 
 # dataframe list
 df_list <- list(resp_casecross, asthma_casecross, copd_casecross, pneum_casecross,
@@ -1439,8 +1441,6 @@ outcome_list <- c('All Respiratory', 'Asthma', 'COPD', 'Pneumonia',
 # looking only at wrf chem, kriging, and geo-weighted; taking out 'Global Smoke' method
 method_list <- c('WRF-Chem Smoke', 'Kriging Smoke', 'Global Smoke', 'Geo-Weighted Smoke')
 
-# sex category list
-sex_strata_list <- c(0,1)
 
 # create an empty list to row bind dataframes together
 datalist1 <- list()
@@ -1456,7 +1456,6 @@ for(i in 1:length(df_list)){
   outcome <- colnames(df_to_loop[3])
   # outcome name
   outcome_name <- outcome_list[i]
-  
   # extract covariates from dataframe
   covariates_df <- df_to_loop[, c(1:16, 27,79:83, 28, 151:157)]
   
@@ -1468,12 +1467,11 @@ for(i in 1:length(df_list)){
 # left off here ---------------
 # need to think if I need a methods section (probably not since this is it)
   
-  glimpse(pm_lag_list)
   # new loop for each element of the lag list 
   for(k in 1:4){
 
     # empty matrix (12 x 10 matrix)
-    point_estimates <- matrix(nrow = 5, ncol = 10, byrow = T)
+    point_estimates <- matrix(nrow = 6, ncol = 10, byrow = T)
     
     colnames(point_estimates) <- c('outcome', 'pm_method', 'lag', 'n', 'n_events', 
                                    'odds_ratio', 'lower95', 'upper95', 'se', 'p_val')
@@ -1483,22 +1481,21 @@ for(i in 1:length(df_list)){
     # repeat the sex category 4 times for each pm method
     point_estimates[, 2] <- method_list[k]
 
+    pm_test <- pm_lag_list[[k]]
+
     # dataframe for analysis creation
     # bind columns back together 
-    df_analysis <- cbind(covariates_df, pm_lag_list[k]) %>% 
-      # remove missing pm values
-      filter(!is.na(wrf_smk_pm_zip)) %>% 
+    df_analysis <- cbind(covariates_df, pm_lag_list[[k]]) %>% 
       # limit to emergency or urgent care
       filter(ADM_TYPE == 1 | ADM_TYPE == 2) %>%
-      # limit to specific sex category
-      filter(sex_num == k) %>% 
       # the following code makes sure that the counterfactual values retained are 
       # symetric in that number of obs before = number of obs after
       mutate(obs_diff_admission = (date - date_admit)/7) 
       # dataframe is already for the entire fire season, so I don't need to subset anymore
-  
+
   # loop to run a model for each lag 0-5
     for(j in 0:5){
+ 
       # finding locations of columns in dataframe
       #which(colnames(df_analysis)=="wrf_temp_zip")
 
@@ -1514,7 +1511,7 @@ for(i in 1:length(df_list)){
       # conditional logistic regression model
       mod <- clogit(outcome ~ df_analysis[[pm_lag_colnum]] + df_analysis[[temp_lag_colnum]] +
                       strata(PATIENTID), df_analysis)
-
+      
       # populate matrix
       point_estimates[row_n, 3] <- j
       point_estimates[row_n, 4] <- mod$n
@@ -1559,25 +1556,25 @@ for(i in 1:length(df_list)){
 # combine each outcome dataframe itteration in to a big dataset
 combined_point_est_df <- bind_rows(datalist2)
 
-geo_smk_est_sex <- combined_point_est_df %>% 
+#glimpse(combined_point_est_df)
+# subset to just geo-smoke estimates for now to reduce number of rows
+geo_smk_est_lag <- combined_point_est_df %>% 
   # filter columns to just geo-smk
   filter(pm_method == "Geo-Weighted Smoke") %>% 
-  mutate(sex_cat = ifelse(sex == 0, "Male", 
-               ifelse(sex == 1, "Female", NA))) %>% 
   # subset columns I want to put in to the table
-  select(11, 5:8) %>% 
+  select(3, 5:8) %>% 
   mutate(odds_ratio = ifelse(odds_ratio == 99, "--", odds_ratio),
          lower95 = ifelse(lower95 == 99, "--", lower95),
          upper95 = ifelse(upper95 == 99, "--", upper95))
 
 
-  tab <- htmlTable(txtRound(geo_smk_est_sex, digits = 3, 1:3), 
-           caption = "Association between a 10 ug/m^3 in PM2.5 geo smoke and health outcomes stratified by sex",
+  tab <- htmlTable(txtRound(geo_smk_est_lag, digits = 3, 1:3), 
+           caption = "Association between a 10 ug/m^3 in PM2.5 geo smoke and health outcomes by lagged days",
            # row group by outcome
            rgroup = outcome_list,
-           n.rgroup = c(rep(2, 12)), # 2 rows for each sex strata for each outcome
+           n.rgroup = c(rep(6, 12)), # 6 rows for each lag period for each outcome
            # column headers
-           header = c("Sex Strata", "Events",
+           header = c("Lagged Days", "Events",
                       "OR&dagger;", "Lower", "Upper"),
            # column spanner
            cgroup = c("", "95% CI"), 
@@ -1594,36 +1591,31 @@ geo_smk_est_sex <- combined_point_est_df %>%
 # ggplot of odds ratios, facet wrapped by outcomes -----
 # convert variables from character to either numeric or factor
 # factor preserves the order of the variable
-geo_smk_sex_plot <- combined_point_est_df %>% 
+geo_smk_lag_plot <- combined_point_est_df %>% 
   # filter columns to just geo-smk
   filter(pm_method == "Geo-Weighted Smoke") %>% 
-  mutate(sex_cat = ifelse(sex == 0, "Male", 
-               ifelse(sex == 1, "Female", NA))) %>%
   # subset columns I want to put in to the table
-  select(1, 3, 11, 5:8) %>% 
-  mutate(odds_ratio = ifelse(odds_ratio == 99, NA, odds_ratio),
-         lower95 = ifelse(lower95 == 99, NA, lower95),
-         upper95 = ifelse(upper95 == 99, NA, upper95))  
+  select(1:3, 5:8) 
 
 # change characters to numeric and factor  
-geo_smk_sex_plot$outcome <- factor(geo_smk_sex_plot$outcome,
-                              levels = unique(geo_smk_sex_plot$outcome))
+geo_smk_lag_plot$outcome <- factor(geo_smk_lag_plot$outcome,
+                              levels = unique(geo_smk_lag_plot$outcome))
 
-geo_smk_sex_plot$pm_method <- factor(geo_smk_sex_plot$pm_method,
-                                levels = unique(geo_smk_sex_plot$pm_method))
+geo_smk_lag_plot$pm_method <- factor(geo_smk_lag_plot$pm_method,
+                                levels = unique(geo_smk_lag_plot$pm_method))
 
-geo_smk_sex_plot$sex_cat <- factor(geo_smk_sex_plot$sex_cat,
-                                levels = unique(geo_smk_sex_plot$sex_cat))
+geo_smk_lag_plot$lag <- factor(geo_smk_lag_plot$lag,
+                                levels = unique(geo_smk_lag_plot$lag))
 
-geo_smk_sex_plot$n_events <- as.numeric(geo_smk_sex_plot$n_events)
-geo_smk_sex_plot$odds_ratio <- as.numeric(geo_smk_sex_plot$odds_ratio)
-geo_smk_sex_plot$lower95 <- as.numeric(geo_smk_sex_plot$lower95)
-geo_smk_sex_plot$upper95 <- as.numeric(geo_smk_sex_plot$upper95)
+geo_smk_lag_plot$n_events <- as.numeric(geo_smk_lag_plot$n_events)
+geo_smk_lag_plot$odds_ratio <- as.numeric(geo_smk_lag_plot$odds_ratio)
+geo_smk_lag_plot$lower95 <- as.numeric(geo_smk_lag_plot$lower95)
+geo_smk_lag_plot$upper95 <- as.numeric(geo_smk_lag_plot$upper95)
 
 
 ## ggplot
-  print_plot <- ggplot(geo_smk_sex_plot,
-                       aes(x = sex_cat, y = odds_ratio, colour = sex_cat)) +
+  print_plot <- ggplot(geo_smk_lag_plot,
+                       aes(x = lag, y = odds_ratio)) +
     geom_point() + #geom_text(vjust = 0, nudge_x = 0.3) +
     geom_errorbar(aes(ymin=lower95, ymax=upper95), width = 0.2) +
     facet_wrap(~outcome, nrow = 3) +
@@ -1631,7 +1623,7 @@ geo_smk_sex_plot$upper95 <- as.numeric(geo_smk_sex_plot$upper95)
     ggtitle('Association Between PM2.5 from \n Wildfire Smoke on Hospitalizations') +
     ylab('Odds Ratio for 10µg/m^3 Increase in PM2.5') +
     #ylim(0.5, 1.5) +
-    xlab('Geo smoke PM2.5 stratified by sex') +
+    xlab('Lagged days of geo smoke PM2.5') +
     scale_colour_discrete(name= "Sex") +
     theme(panel.background = element_rect(fill = 'white', colour = 'black'),
     panel.grid.major = element_blank(),
@@ -1644,7 +1636,7 @@ geo_smk_sex_plot$upper95 <- as.numeric(geo_smk_sex_plot$upper95)
     legend.text = element_text(size = 7),
     # axis element
     axis.title.y = element_text(angle = 90),
-    axis.text.x = element_blank(),
+    #axis.text.x = element_blank(),
     axis.title.y = element_text(angle = 90))
 
 
@@ -1659,13 +1651,15 @@ In some of my other documents, I tried different referent selection schemes for 
 
 ## County-Level Exposure
 
+###Note: Suppressing the code and output for this chunk for now 
+
 A second health paper will be paired with CDC mortality data (thanks to Rish). One big difference is that the finest spatial resolution available is county. I have rerun the morbidity analyses using county-level population-weighted PM~2.5~. I think an additional benefit is that I have enough events in each county to run a time-series study, analyzed via poisson regression. This is a good check as the time-series and time-stratfied designs should produce nearly identical results (given certain assumptions).
 
 ## Time-Stratified Case-Crossover for the Fire Season using County-Level Exposure 
 
 The following talbe is similar to the previous time-stratified case-crossover within the fire season, except instead of using PM~2.5~ at the zip code level, I used population-weighted county-level PM~2.5~. 
 
-```{r time stratified design county within fire season, echo = F, results='asis'} 
+```{r time stratified design county within fire season, eval = F, echo = F, results='asis'} 
 # note above, results = 'asis' needed to print htmlTables
 
 # I removed copd exacerbation and rheuamtoid arthritis
@@ -1853,7 +1847,7 @@ The analyses I used were a generalized mixed model, where the dependent variable
 
 The results can be interpreted as you would a risk ratio or odds ratio from the time-stratified case-cross over design.
 
-```{r time series rando effect, echo = F, warning= F, results='asis'} 
+```{r time series rando effect, echo = F, warning= F, eval= F, results='asis'} 
 
 # load time series dataframe
 wash_ts_df <- read_csv(paste(path, "wa_2012_county_time_series.csv", sep="/"))
@@ -2024,7 +2018,6 @@ combined_point_est_df$upper95 <- as.numeric(combined_point_est_df$upper95)
 
 The tables contain the risk ratio estimates for the association between a linear increase in wildfire smoke PM~2.5~ and the health outcomes of interest. Using asthma as our example, we'd conclude that between July and October in 2012, a 10 unit increase wildfire smoke PM~2.5~, the risk for asthma increased by ~9% to ~13%, depending on the smoke estimate used. All smoke estimation methods were statistically significant for asthma. 
 
-
 ### Some Thoughts...
 
 1. Can I do a time-series study at the zip level? Could be very small sample sizes for each zip and perhaps not enough variability.
@@ -2032,13 +2025,6 @@ The tables contain the risk ratio estimates for the association between a linear
 
 ### To Do:
 
-1. Stratified estimates by age category and sex.
-2. Lag effects.
-3. Compare zip vs county assignment of PM~2.5~
-4. Get Rish population-weighted estimates by county with FIPS codes.
+1. 0-2 moving lag effects.
 
-### Recommendations for Rish:
-
-1. Run time-series poisson model.
-2. Run time-stratified case-crossover design using all available referent periods within the July 1st to October 31st timeframe for each subject. 
 
