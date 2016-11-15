@@ -95,12 +95,10 @@ broken_arm_casecross <- read_csv(paste(path,
                                        sep="/"))
 
 # read county smoke pm for figures 
-county_pm <- read_csv(paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
-            "wildfire_washington/smoke/pm_data/wa_county_pop_wt_pm.csv"))
+county_pm <- read_csv("../smoke/pm_data/wa_county_pop_wt_pm.csv")
 
 # read zip pm for counts by zip
-#zip_pm <- read_csv(paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
-#              "wildfire_washington/smoke/pm_data/zip_pm_to_merge_with_chars.csv"))
+zip_pm <- read_csv("../smoke/pm_data/zip_pm_to_merge_with_chars.csv")
 
 # read locations of fires
 #fire_loc <- read_csv(paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
@@ -144,9 +142,65 @@ ggplot(county_pm, aes(x = date)) +
     axis.title.y = element_text(angle = 90),
     # facet themes
     strip.background = element_rect(fill = 'white')) 
+
+# make a plot for Chelan only
+chelan_pm <- county_pm %>% filter(county == "Chelan")
+# Chelan plot
+chelan_pm_times_serie <- ggplot(county_pm, aes(x = date)) + 
+  #scale_x_date(date_labels = '%m')+ # having issues with the date scale
+  geom_jitter(aes(y = wrf_pm, colour = 'WRF-Chem'), size = 0.75) + 
+  geom_jitter(aes(y = geo_wt_pm, colour = 'Geo-Weight'), size = 0.75) +
+  # custom colour
+  scale_colour_manual(name='Method', values= c("red", "blue")) +
+  ggtitle(expression('Chelan County PM2.5 µg/m'^3, ' by Date')) +
+  ylab(expression('Population-Weighted PM2.5 µg/m'^3)) +
+  xlab('Month in 2012') + 
+  theme(panel.background = element_rect(fill = 'white', colour = 'black'),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.title.y = element_text(angle = 90),
+    axis.title.y = element_text(angle = 90),
+    # facet themes
+    strip.background = element_rect(fill = 'white')) 
+
+plot(chelan_pm_times_serie)
+
+ggsave("chelan_pm_timeseries", chelan_pm_times_serie, device = "pdf", width = 9, height = 5)
 ```
 
+### Wenatchee zip code time series
+```{r zip 98801, echo = F, results='asis'}
 
+zip_98801 <- zip_pm %>% filter(ZIPCODE == "98801")
+
+# time series plot
+zip_pm_times_series <- ggplot(zip_98801, aes(x = date)) + 
+  #scale_x_date(date_labels = '%m')+ # having issues with the date scale
+  geom_jitter(aes(y = wrf_pm, colour = 'WRF-Chem'), size = 0.75) + 
+  geom_jitter(aes(y = geo_wt_pm, colour = 'Geo-Weight'), size = 0.75) +
+  # custom colour
+  scale_colour_manual(name='Method', values= c("red", "blue")) +
+ # ggtitle(expression('Chelan County PM2.5 µg/m'^3, ' by Date')) +
+  ylab(expression('Population-Weighted PM2.5 µg/m'^3)) +
+  xlab('Month in 2012') + 
+  theme(panel.background = element_rect(fill = 'white', colour = 'black'),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+    axis.title.y = element_text(angle = 90, size = 14),
+    axis.title.x = element_text(size = 14),
+    legend.text = element_text(size = 12),
+    legend.title = element_text(size = 14),
+    # facet themes
+    strip.background = element_rect(fill = 'white')) 
+
+plot(zip_pm_times_series)
+
+ggsave("zip_98801_pm_timeseries", zip_pm_times_series, device = "pdf", width = 9, height = 5)
+
+
+```
 ## Days of Smoke In Washington
 
 Here is a figure of the days from July 1st to October 31st 2012 where PM~2.5~ exceeded >0, >5, and >10.
@@ -946,6 +1000,39 @@ combined_point_est_df$p_val <- as.numeric(combined_point_est_df$p_val)
 
 
   print(print_plot)
+  
+# bonne would like global smoke variable removed
+no_global_or_krig_df <- combined_point_est_df %>% filter(pm_method != "Global Smoke" & pm_method != "Kriging Smoke")
+ glimpse(no_global_or_krig_df)
+
+print_plot <- ggplot(no_global_or_krig_df, 
+    aes(x = pm_method, y = odds_ratio, colour = pm_method)) +
+    geom_point() + #geom_text(vjust = 0, nudge_x = 0.3) +
+    geom_errorbar(aes(ymin=lower95, ymax=upper95), width = 0.2) +
+    facet_wrap(~outcome, nrow = 3) +
+    geom_hline(yintercept = 1, linetype=2) +
+    #ggtitle('Association Between PM2.5 from \n Wildfire Smoke on Hospitalizations') +
+    ylab('Odds Ratio for 10µg/m^3 Increase in PM2.5') +
+    xlab('Time-Stratified Within July to October Fire Season') +
+    scale_colour_discrete(name= "Smoke Method") +
+    theme(panel.background = element_rect(fill = 'white', colour = 'black'),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    # strip element
+    strip.background = element_rect(colour=NA, fill=NA),
+    panel.border = element_rect(fill = NA, color = "black"),
+    # facet text size
+    strip.text = element_text(size = 7),
+    legend.text = element_text(size = 7),
+    # axis element
+    axis.title.y = element_text(angle = 90),
+    axis.text.x = element_blank(),
+    axis.title.y = element_text(angle = 90))
+
+
+  print(print_plot)
+  
+  ggsave("main_results",print_plot, device = "pdf", width = 8, height = 5)
 
 ```
 
