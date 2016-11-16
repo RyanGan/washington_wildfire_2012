@@ -30,12 +30,12 @@ Note, epidemiological methods that Sheryl and I think can improve our estimation
 ```{r data import, include = F, echo = FALSE}
 # Set working directory and read in files --------------------------------------
 # direct path for mac
-#path <- paste0("/Users/ryangan/Documents/local_git_repo/wildfire_washington/",
-#        "analysis/analysis_data")
-getwd()
+path <- paste0("/Users/ryangan/Documents/local_git_repo/wildfire_washington/",
+        "analysis/analysis_data")
+
 # direct path for pc
-path <- paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
-               "wildfire_washington/analysis/analysis_data")
+#path <- paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
+#               "wildfire_washington/analysis/analysis_data")
 
 # Infile case-crossover dataframes ---------------------------------------------
 # Dataframes made in 'chars_3month_binary_smoke_may2016 script
@@ -98,16 +98,11 @@ broken_arm_casecross <- read_csv(paste(path,
 county_pm <- read_csv("../smoke/pm_data/wa_county_pop_wt_pm.csv")
 
 # read zip pm for counts by zip
-<<<<<<< HEAD
+
 zip_pm <- read_csv("../smoke/pm_data/zip_pm_to_merge_with_chars.csv")
-=======
-zip_pm <- read_csv(paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
-              "wildfire_washington/smoke/pm_data/zip_pm_to_merge_with_chars.csv"))
->>>>>>> 2da44de301adbea0b3e28b8e0d757a0be8d11cfd
 
 # read locations of fires
-fire_loc <- read_csv(paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
-              "wildfire_washington/smoke/pm_data/washington_fires_locations201209.csv"))
+fire_loc <- read_csv("../smoke/pm_data/washington_fires201209.csv")
 
 ```
 
@@ -148,7 +143,6 @@ print_plot <-ggplot(county_pm, aes(x = date)) +
     # facet themes
     strip.background = element_rect(fill = 'white')) 
 
-<<<<<<< HEAD
 # make a plot for Chelan only
 chelan_pm <- county_pm %>% filter(county == "Chelan")
 # Chelan plot
@@ -172,9 +166,9 @@ chelan_pm_times_serie <- ggplot(county_pm, aes(x = date)) +
 plot(chelan_pm_times_serie)
 
 ggsave("chelan_pm_timeseries", chelan_pm_times_serie, device = "pdf", width = 9, height = 5)
-=======
+
 print(print_plot)
->>>>>>> 2da44de301adbea0b3e28b8e0d757a0be8d11cfd
+
 ```
 
 ### Wenatchee zip code time series
@@ -259,14 +253,14 @@ wa_county <- subset(counties, region == 'washington')
 
 # read zip code shape file
 # pc directory (I need to really figure out relaitve paths)
-shp_dir <- paste0('C:/Users/RGan/Google Drive/CSU/wild_fire/shape_files/',
+shp_dir <- paste0('/Users/ryangan/Google Drive/CSU/wild_fire/shape_files/',
                   'us_census_shapes/tl_2012_us_zcta510')
-
+getwd()
 us_zip_2012 <- readOGR(dsn = shp_dir, layer = 'tl_2012_us_zcta510')
 
 # subset to just washington state by joining to zip codes in CHARS data
 # import zipcodes in CHARS dataset
-zip_file <- paste0("C:/Users/RGan/Google Drive/CSU/wild_fire/washington/",
+zip_file <- paste0("/Users/ryangan/Google Drive/CSU/wild_fire/washington/",
                    "smoke_data/created_pm_estimates/wash_zip_2012.csv")
 
 chars_zip_2012 <- read.csv(zip_file) %>% 
@@ -304,6 +298,8 @@ print_map <- ggmap(washington_map) +
         axis.ticks=element_blank(),
         axis.title.x=element_blank(),
         axis.title.y=element_blank())
+
+print(print_map)
 
 ```
 
@@ -1012,7 +1008,7 @@ combined_point_est_df$p_val <- as.numeric(combined_point_est_df$p_val)
   
 # bonne would like global smoke variable removed
 no_global_or_krig_df <- combined_point_est_df %>% filter(pm_method != "Global Smoke" & pm_method != "Kriging Smoke")
- glimpse(no_global_or_krig_df)
+# glimpse(no_global_or_krig_df)
 
 print_plot <- ggplot(no_global_or_krig_df, 
     aes(x = pm_method, y = odds_ratio, colour = pm_method)) +
