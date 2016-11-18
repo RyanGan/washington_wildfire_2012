@@ -928,7 +928,8 @@ The tables contain the risk ratio estimates for the association between a linear
 
 
 ### Lag Periods
-Keep in mind this code chunk is  zip-level. Save lag code for county-level analyses. 
+County-level assignment of PM~2.5~ lagged days analysis.
+
 ```{r time stratified design within fire season lags, echo = F, results='asis'} 
 # note above, results = 'asis' needed to print htmlTables
 
@@ -954,22 +955,22 @@ datalist2 <- list()
 # data wrangling ----
 # Producing conditional logit model estimates loop 
 for(i in 1:length(df_list)){
-
-# dataframe to loop through
+  
+  # dataframe to loop through
   df_to_loop <- data.frame(df_list[i])
   # indication of column
   outcome <- colnames(df_to_loop[3])
   # outcome name
   outcome_name <- outcome_list[i]
   # extract covariates from dataframe
-  covariates_df <- df_to_loop[, c(1:16, 27,79:83, 28, 151:157)]
+  covariates_df <- df_to_loop[, c(1:16, 94, 146:150, 95, 151:157)]
   
   # extract pm values and divide by 10 and ordered
-  #which(colnames(df_to_loop)=="wrf_temp_lag1_zip") # code to find column numbers
-  #which(colnames(df_to_loop)=="wrf_temp_zip") # code to find column numbers
-  pm_lag_list <- list(df_to_loop[, c(19, 39:43)]/10, df_to_loop[, c(26, 74:78)]/10,
-                  df_to_loop[, c(25, 69:73)]/10, df_to_loop[, c(24, 64:68)]/10)  # create 10 unit increases
-# left off here ---------------
+  #which(colnames(df_to_loop)=="wrf_smk_pm_lag1_county") # code to find column numbers
+
+  pm_lag_list <- list(df_to_loop[, c(86, 106:110)]/10, df_to_loop[, c(93, 141:145)]/10,
+                  df_to_loop[, c(92, 136:140)]/10, df_to_loop[, c(91, 131:135)]/10)  # create 10 unit increases
+
 # need to think if I need a methods section (probably not since this is it)
   
   # new loop for each element of the lag list 
@@ -1087,7 +1088,7 @@ geo_smk_est_lag <- combined_point_est_df %>%
            padding.rgroup = "&nbsp;&nbsp;",
            css.cell = "padding-left: 0.5em; padding-right: .5em;", # cell space
            align = "lcccccc", # column alignment,
-           tfoot="&dagger; Adjusted for temperature, accounting for subject. Time-stratified: referent periods matched to events on same day of week within July to October fire season."
+           tfoot="&dagger; PM assigned by county. Adjusted for temperature, accounting for subject. Time-stratified: referent periods matched to events on same day of week within July to October fire season."
             ) # end table
   
   print(tab)
