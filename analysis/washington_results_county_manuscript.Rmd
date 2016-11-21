@@ -96,11 +96,16 @@ broken_arm_casecross <- read_csv(paste(path,
                                        "broken_arm1_jul_to_oct_time_strat_casecross.csv",
                                        sep="/"))
 
-# read county smoke pm for figures 
-county_pm <- read_csv("../smoke/pm_data/wa_county_pop_wt_pm.csv")
+# read county smoke pm for figures with FIPS codes
+county_pm <- read_csv("../smoke/pm_data/wa_county_fips_pop_wt_pm.csv") 
 
 # read locations of fires
 fire_loc <- read_csv("../smoke/pm_data/washington_fires201209.csv")
+
+# import the county-level met data files Rish sent
+county_met <- read_csv("./analysis_data/wa_cty_exp_0710_2012_ryan.csv") %>% 
+  # define date variable; original character looked like: 01JUL2012
+  mutate(date = as.Date(date, "%d%B%Y"))
 
 ```
 
@@ -372,7 +377,7 @@ This design has an advantage over other case-crossover designs I've explored in 
 
 A second health paper will be paired with CDC mortality data (thanks to Rish). One big difference is that the finest spatial resolution available is county. I have rerun the morbidity analyses using county-level population-weighted PM~2.5~. I think an additional benefit is that I have enough events in each county to run a time-series study, analyzed via poisson regression. This is a good check as the time-series and time-stratfied designs should produce nearly identical results (given certain assumptions).
 
-## Time-Stratified Case-Crossover for the Fire Season using County-Level Exposure 
+### Time-Stratified Case-Crossover for the Fire Season using County-Level Exposure 
 
 The following talbe is similar to the previous time-stratified case-crossover within the fire season, except instead of using PM~2.5~ at the zip code level, I used population-weighted county-level PM~2.5~. 
 
@@ -557,6 +562,36 @@ combined_point_est_df$p_val <- as.numeric(combined_point_est_df$p_val)
 ```
 
 County-level results are nearly identical to results when using the zip code-level results. That's pretty cool and reassuring. I think the population-weighting must reduce exposure misclassification to a good degree, weighting PM~2.5~ values more heavily to where most people live.
+
+### Time-Stratified Case-Crossover Adjusting CDC Met Variables
+
+```{r data wrangle with county met vars, warning = F, echo = F, message = F}
+
+# merge in FIPS codes and county names with the data provided by Rish
+county_fips_key <- county_pm %>% 
+  # make FIPS5 variable to mereg; add the 53 washington code before the fips county code for merge
+  mutate(FIPS5 = paste0("53", fips)) %>% 
+  # select only county and FIPS5 variables
+  select(county, FIPS5) %>%
+  # limit to unique counties
+  unique()
+
+# create dataset that can be merged to case-cross over dataframes
+daily_county_met <- county_met %>%
+  # limit to new met variables (getting rid of smoke variables I already have)
+  select(1:17) %>% 
+  mutate(FIPS5 = as.character(FIPS5)) %>% 
+  right_join(county_fips_key, by = "FIPS5")
+
+```
+
+
+```{r time strat met adjustments, warning = F, echo = F, message = F, results='asis'}
+
+
+
+
+```
 
 ### Three-day moving lag (0-2) PM~2.5~ 
 
@@ -1152,11 +1187,8 @@ geo_smk_lag_plot$upper95 <- as.numeric(geo_smk_lag_plot$upper95)
 
 ### Some Thoughts...
 
-1. Can I do a time-series study at the zip level? Could be very small sample sizes for each zip and perhaps not enough variability.
-2. Is a subtraction of baseline values off a particular exposure method good enough to justify PM~2.5~ due to smoke?
+1. Is a subtraction of baseline values off a particular exposure method good enough to justify PM~2.5~ due to smoke?
 
-### To Do:
 
-1. 0-2 moving lag effects.
 
 
