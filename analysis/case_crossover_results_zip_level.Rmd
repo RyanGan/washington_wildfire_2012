@@ -87,8 +87,13 @@ broken_arm_casecross <- read_csv(paste(path,
                                        sep="/"))
 
 # zip smoke pm 
-#zip_pm <- read_csv(paste(path, "../smoke/zip_population_weighted_pm/zip_pm_to_merge_with_chars.csv",
-#                         sep="/"))
+zip_pm <- read_csv("../smoke/pm_data/zip_pm_to_merge_with_chars.csv")
+
+
+# import the zip-level met data files Rish sent
+zip_met <- read_csv("./analysis_data/wa_zip_exp_0710_2012_ryan.csv") %>% 
+  # define date variable; original character looked like: 01JUL2012
+  mutate(date = as.Date(date, "%d%B%Y"))
 
 ```
 
