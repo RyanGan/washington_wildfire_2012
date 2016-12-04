@@ -171,9 +171,10 @@ chelan_pm_times_series <- ggplot(county_pm, aes(x = date)) +
 
 plot(chelan_pm_times_series)
 
-ggsave("chelan_pm_timeseries", chelan_pm_times_series, device = "pdf", width = 9, height = 5)
+# ggsave("chelan_pm_timeseries", chelan_pm_times_series, device = "pdf", width = 9, height = 5)
 
 print(print_plot)
+
 
 ```
 
@@ -183,7 +184,7 @@ print(print_plot)
 zip_98801 <- zip_pm %>% filter(ZIPCODE == "98801")
 
 # time series plot
-zip_pm_times_series <- ggplot(zip_98801, aes(x = date)) + 
+zip_pm_time_series <- ggplot(zip_98801, aes(x = date)) + 
   #scale_x_date(date_labels = '%m')+ # having issues with the date scale
   geom_jitter(aes(y = wrf_pm, colour = 'WRF-Chem'), size = 0.75) + 
   geom_jitter(aes(y = krig_pm, colour = 'Krig'), size = 0.75) +
@@ -205,9 +206,40 @@ zip_pm_times_series <- ggplot(zip_98801, aes(x = date)) +
     # facet themes
     strip.background = element_rect(fill = 'white')) 
 
-plot(zip_pm_times_series)
+plot(zip_pm_time_series)
 
-ggsave("zip_98801_pm_timeseries", zip_pm_times_series, device = "pdf", width = 9, height = 5)
+#ggsave("zip_98801_pm_timeseries", zip_pm_times_series, device = "pdf", width = 9, height = 5)
+
+# trying another type of plot to represent the data. 
+# trying sheryl's suggestion of min median max
+
+# find the min, median, and max values for each date
+summary(filter(zip_pm, date == "2012-07-01"))
+
+
+pm_range <- zip_pm %>% group_by(date) %>% 
+  summarise(geo_min = log(min(geo_smk_pm, na.rm = T)+0.5), 
+            geo_med = log(median(geo_smk_pm, na.rm = T)+0.5), 
+            geo_max = log(max(geo_smk_pm, na.rm = T)+0.5))
+  
+summary(pm_range)
+
+ggplot(pm_range, aes(x = date)) +
+  geom_ribbon(aes(ymin = geo_min, ymax = geo_max), fill = "grey70") +
+  geom_line(aes(y = geo_med)) +
+  ylab(expression('ln Population-Weighted PM2.5 µg/m'^3)) +
+  xlab('Date') + 
+  theme(panel.background = element_rect(fill = 'white', colour = 'black'),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+    axis.title.y = element_text(angle = 90, size = 12),
+    axis.title.x = element_text(size = 14))
+    #legend.text = element_text(size = 12),
+    #legend.title = element_text(size = 14))
+
+
 
 
 ```
