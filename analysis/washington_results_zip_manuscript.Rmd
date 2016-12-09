@@ -231,38 +231,46 @@ plot(zip_pm_time_series)
 
 I believe using county-level time-series might be a bit confusing, and there are way too many zip codes to create small-multiples time-series. Sheryl proposed a range of min, median, and max values of the zip codes over time. I think that would work well. I decided on a natural-log transformation of the values as it was impossible to see the median values as the max values were so high, making the y scale high. Here I use the smoke variables, but it would be worth considering if we should present the values not accounting for smoke instead.
 
-```{r time series range, echo = F, results='asis', message=F}
+#### Natural-Log Transformed Smoke PM~2.5~ Timeseries 
+
+Figures below are for each smoke PM~2.5~ estimation method. The figures are the daily range (min and max) and median values for each zip code in the state. Jeff noticed that the geo smoke, global, and krig models all have some increased bumps indicating smoke exposure in time periods where that may not be the case (WRF model does not show it). I thought I may have coded something wrong as I added a small value (0.5) to all smoke estimates to avoid logging a 0 value, but that doesn't seem to be the case. I think it might have to do with the subtraction of the 'background' values and will explore this further.
+
+```{r smk time series range, echo = F, results='asis', message=F}
 
 
 # find the min, median, and max values for each date
-summary(filter(zip_pm, date == "2012-07-01")) # quick sum of first zip obs 
+#summary(filter(zip_pm, date == "2012-07-9")) # quick sum of first zip obs 
 
 # wrf smoke
 wrf_range <- zip_pm %>% group_by(date) %>% 
-  summarise(min = log(min(wrf_smk_pm, na.rm = T)+0.5), 
-            med = log(median(wrf_smk_pm, na.rm = T)+0.5), 
-            max = log(max(wrf_smk_pm, na.rm = T)+0.5)) %>% 
+  mutate(ln_wrf_smk = log(wrf_smk_pm + 0.5)) %>% 
+  summarise(min = min(ln_wrf_smk, na.rm = T), 
+            med = median(ln_wrf_smk, na.rm = T), 
+            max = max(ln_wrf_smk, na.rm = T)) %>% 
   mutate(est_method = "wrf_smk")
 
 # krig smoke
 krig_range <- zip_pm %>% group_by(date) %>% 
-  summarise(min = log(min(krig_smk_pm, na.rm = T)+0.5), 
-            med = log(median(krig_smk_pm, na.rm = T)+0.5), 
-            max = log(max(krig_smk_pm, na.rm = T)+0.5)) %>% 
+  mutate(ln_krig_smk = log(krig_smk_pm + 0.5)) %>% 
+  summarise(min = min(ln_krig_smk, na.rm = T), 
+            med = median(ln_krig_smk, na.rm = T), 
+            max = max(ln_krig_smk, na.rm = T)) %>% 
   mutate(est_method = "krig_smk")
 
 # global smoke
 global_range <- zip_pm %>% group_by(date) %>% 
-  summarise(min = log(min(global_smk_pm, na.rm = T)+0.5), 
-            med = log(median(global_smk_pm, na.rm = T)+0.5), 
-            max = log(max(global_smk_pm, na.rm = T)+0.5)) %>% 
+  mutate(ln_global_smk = log(global_smk_pm + 0.5)) %>% 
+  summarise(min =min(ln_global_smk, na.rm = T), 
+            med =median(ln_global_smk, na.rm = T), 
+            max =max(ln_global_smk, na.rm = T)) %>% 
   mutate(est_method = "global_smk")
 
 # geo smoke
 geo_range <- zip_pm %>% group_by(date) %>% 
-  summarise(min = log(min(geo_smk_pm, na.rm = T)+0.5), 
-            med = log(median(geo_smk_pm, na.rm = T)+0.5), 
-            max = log(max(geo_smk_pm, na.rm = T)+0.5)) %>% 
+  mutate(ln_geo_smk = log(geo_smk_pm + 0.5)) %>% 
+  summarise(min = min(ln_geo_smk, na.rm = T), 
+            med = median(ln_geo_smk, na.rm = T), 
+            max = max(ln_geo_smk, na.rm = T)) %>% 
   mutate(est_method = "geo_smk")
 
 # bind all rows to make a small-multiples graph
@@ -299,6 +307,97 @@ plot_2_print<- ggplot(pm_range, aes(x = date)) +
 
 print(plot_2_print)
 
+
+```
+
+First I'm going to look at the ln-transformed timeseries of the PM~2.5~ values not subtracting background PM~2.5~ levels.
+
+```{r ln time series range, echo = F, results='asis', message=F}
+
+glimpse(zip_pm)
+# wrf 
+wrf_range <- zip_pm %>% group_by(date) %>% 
+  mutate(ln_wrf = log(wrf_pm)) %>% 
+  summarise(min = min(ln_wrf, na.rm = T), 
+            med = median(ln_wrf, na.rm = T), 
+            max = max(ln_wrf, na.rm = T)) %>% 
+  mutate(est_method = "wrf")
+
+# wrf no fire level
+wrf_nf_range <- zip_pm %>%  group_by(date) %>% 
+  mutate(ln_wrf_nf = log(wrf_nf_pm)) %>% 
+  summarise(nf_min = min(ln_wrf_nf, na.rm = T), 
+            nf_med = median(ln_wrf_nf, na.rm = T), 
+            nf_max = max(ln_wrf_nf, na.rm = T)) 
+# bind in WRF no fire
+wrf_range <- full_join(wrf_range, wrf_nf_range, by = "date")
+
+
+# background
+bg_range <- zip_pm %>% group_by(date) %>% 
+  mutate(ln_bg = log(background_pm)) %>% 
+  summarise(nf_min = min(ln_bg, na.rm = T), 
+            nf_med = median(ln_bg, na.rm = T), 
+            nf_max = max(ln_bg, na.rm = T)) 
+
+# krig 
+krig_range <- zip_pm %>% group_by(date) %>% 
+  mutate(ln_krig = log(krig_pm)) %>% 
+  summarise(min = min(ln_krig, na.rm = T), 
+            med = median(ln_krig, na.rm = T), 
+            max = max(ln_krig, na.rm = T)) %>% 
+  full_join(bg_range, by = "date") %>% 
+  mutate(est_method = "krig")
+
+# global 
+global_range <- zip_pm %>% group_by(date) %>% 
+  mutate(ln_global = log(global_reg_pm)) %>% 
+  summarise(min =min(ln_global, na.rm = T), 
+            med =median(ln_global, na.rm = T), 
+            max =max(ln_global, na.rm = T)) %>% 
+  full_join(bg_range, by = "date") %>% 
+  mutate(est_method = "global")
+
+# geo 
+geo_range <- zip_pm %>% group_by(date) %>% 
+  mutate(ln_geo = log(geo_wt_pm)) %>% 
+  summarise(min = min(ln_geo, na.rm = T), 
+            med = median(ln_geo, na.rm = T), 
+            max = max(ln_geo, na.rm = T)) %>% 
+  full_join(bg_range, by = "date") %>% 
+  mutate(est_method = "geo")
+
+
+# bind all rows to make a small-multiples graph
+pm_range <- wrf_range %>% bind_rows(krig_range) %>% 
+  bind_rows(global_range) %>% bind_rows(geo_range) 
+
+# preserve order of estimation method
+pm_range$est_method <- factor(pm_range$est_method,
+                        levels = unique(pm_range$est_method))
+
+# plot
+plot_2_print<- ggplot(pm_range, aes(x = date)) +
+  geom_ribbon(aes(ymin = min, ymax = max, fill = "Estimated PM2.5"), 
+              alpha = 0.3, fill = "lightblue") +
+  geom_ribbon(aes(ymin = nf_min, ymax = nf_max, fill = "Background PM2.5"),
+              alpha =0.3, fill = "pink") +
+  geom_line(aes(y = med), colour = "blue") +
+  geom_line(aes(y = nf_med), colour= "red") +
+  facet_wrap(~ est_method) +
+  ylab(expression('Natural-Log PM2.5 µg/m'^3)) +
+  xlab('Date') + 
+  theme(panel.background = element_rect(fill = 'white', colour = 'black'),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+    axis.title.y = element_text(angle = 90, size = 12),
+    axis.title.x = element_text(size = 14), 
+    strip.background = element_rect(fill = 'white')) 
+
+  
+print(plot_2_print)
 
 ```
 
@@ -2491,7 +2590,7 @@ for(i in 1:length(df_list)){
       # join in cdc met data
       full_join(daily_zip_met, by = c("ZIPCODE", "date")) 
       # dataframe is already for the entire fire season, so I don't need to subset anymore
-glimpse(df_analysis)
+#glimpse(df_analysis)
     
   # loop to run a model for each lag 0-5
     for(j in 0:5){
