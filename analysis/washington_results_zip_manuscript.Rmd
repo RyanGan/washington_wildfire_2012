@@ -312,58 +312,58 @@ print(plot_2_print)
 
 First I'm going to look at the ln-transformed timeseries of the PM~2.5~ values not subtracting background PM~2.5~ levels.
 
-```{r ln time series range, echo = F, results='asis', message=F}
+```{r time series range, echo = F, results='asis', message=F}
 
-glimpse(zip_pm)
+#glimpse(zip_pm)
 # wrf 
 wrf_range <- zip_pm %>% group_by(date) %>% 
-  mutate(ln_wrf = log(wrf_pm)) %>% 
-  summarise(min = min(ln_wrf, na.rm = T), 
-            med = median(ln_wrf, na.rm = T), 
-            max = max(ln_wrf, na.rm = T)) %>% 
+  mutate(wrf = (wrf_pm)) %>% 
+  summarise(min = min(wrf, na.rm = T), 
+            med = median(wrf, na.rm = T), 
+            max = max(wrf, na.rm = T)) %>% 
   mutate(est_method = "wrf")
 
 # wrf no fire level
 wrf_nf_range <- zip_pm %>%  group_by(date) %>% 
-  mutate(ln_wrf_nf = log(wrf_nf_pm)) %>% 
-  summarise(nf_min = min(ln_wrf_nf, na.rm = T), 
-            nf_med = median(ln_wrf_nf, na.rm = T), 
-            nf_max = max(ln_wrf_nf, na.rm = T)) 
+  mutate(wrf_nf = (wrf_nf_pm)) %>% 
+  summarise(nf_min = min(wrf_nf, na.rm = T), 
+            nf_med = median(wrf_nf, na.rm = T), 
+            nf_max = max(wrf_nf, na.rm = T)) 
 # bind in WRF no fire
 wrf_range <- full_join(wrf_range, wrf_nf_range, by = "date")
 
 
 # background
 bg_range <- zip_pm %>% group_by(date) %>% 
-  mutate(ln_bg = log(background_pm)) %>% 
-  summarise(nf_min = min(ln_bg, na.rm = T), 
-            nf_med = median(ln_bg, na.rm = T), 
-            nf_max = max(ln_bg, na.rm = T)) 
+  mutate(bg = (background_pm)) %>% 
+  summarise(nf_min = min(bg, na.rm = T), 
+            nf_med = median(bg, na.rm = T), 
+            nf_max = max(bg, na.rm = T)) 
 
 # krig 
 krig_range <- zip_pm %>% group_by(date) %>% 
-  mutate(ln_krig = log(krig_pm)) %>% 
-  summarise(min = min(ln_krig, na.rm = T), 
-            med = median(ln_krig, na.rm = T), 
-            max = max(ln_krig, na.rm = T)) %>% 
+  mutate(krig = (krig_pm)) %>% 
+  summarise(min = min(krig, na.rm = T), 
+            med = median(krig, na.rm = T), 
+            max = max(krig, na.rm = T)) %>% 
   full_join(bg_range, by = "date") %>% 
   mutate(est_method = "krig")
 
 # global 
 global_range <- zip_pm %>% group_by(date) %>% 
-  mutate(ln_global = log(global_reg_pm)) %>% 
-  summarise(min =min(ln_global, na.rm = T), 
-            med =median(ln_global, na.rm = T), 
-            max =max(ln_global, na.rm = T)) %>% 
+  mutate(global = (global_reg_pm)) %>% 
+  summarise(min =min(global, na.rm = T), 
+            med =median(global, na.rm = T), 
+            max =max(global, na.rm = T)) %>% 
   full_join(bg_range, by = "date") %>% 
   mutate(est_method = "global")
 
 # geo 
 geo_range <- zip_pm %>% group_by(date) %>% 
-  mutate(ln_geo = log(geo_wt_pm)) %>% 
-  summarise(min = min(ln_geo, na.rm = T), 
-            med = median(ln_geo, na.rm = T), 
-            max = max(ln_geo, na.rm = T)) %>% 
+  mutate(geo = (geo_wt_pm)) %>% 
+  summarise(min = min(geo, na.rm = T), 
+            med = median(geo, na.rm = T), 
+            max = max(geo, na.rm = T)) %>% 
   full_join(bg_range, by = "date") %>% 
   mutate(est_method = "geo")
 
@@ -378,14 +378,14 @@ pm_range$est_method <- factor(pm_range$est_method,
 
 # plot
 plot_2_print<- ggplot(pm_range, aes(x = date)) +
-  geom_ribbon(aes(ymin = min, ymax = max, fill = "Estimated PM2.5"), 
+  geom_ribbon(aes(ymin = min, ymax = max, fill = "lightblue"), 
               alpha = 0.3, fill = "lightblue") +
-  geom_ribbon(aes(ymin = nf_min, ymax = nf_max, fill = "Background PM2.5"),
+  geom_ribbon(aes(ymin = nf_min, ymax = nf_max, fill = "pink"),
               alpha =0.3, fill = "pink") +
   geom_line(aes(y = med), colour = "blue") +
   geom_line(aes(y = nf_med), colour= "red") +
-  facet_wrap(~ est_method) +
-  ylab(expression('Natural-Log PM2.5 µg/m'^3)) +
+  facet_wrap(~ est_method, scales = "free") +
+  ylab(expression('PM2.5 µg/m'^3)) +
   xlab('Date') + 
   theme(panel.background = element_rect(fill = 'white', colour = 'black'),
     panel.grid.major = element_blank(),
@@ -398,6 +398,7 @@ plot_2_print<- ggplot(pm_range, aes(x = date)) +
 
   
 print(plot_2_print)
+#ggsave("pm_ts.pdf", plot_2_print)
 
 ```
 
