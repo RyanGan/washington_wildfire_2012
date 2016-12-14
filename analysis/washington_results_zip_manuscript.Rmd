@@ -12,7 +12,7 @@ library(survival) # for conditional logistic regression
 library(htmlTable) # table
 library(lme4) # random-effects model
 library(broom) # broom for tidy data from stats models
-
+library(cowplot) # for multi plot image
 
 # spatial packages
 library(ggmap) # map package
@@ -234,10 +234,11 @@ I believe using county-level time-series might be a bit confusing, and there are
 
 Figures below are for each smoke PM~2.5~ estimation method. The figures are the daily range (min and max) for each zip code in a specific region of the state. The figure first starts out by showing the map of the state, divided in to eco regions used by the state for organization purposes. 
 
-```{r smk time series range, echo = F, results='asis', message=F}
+```{r smk time series range by eco region, echo = F, results='asis', message=F}
 
+# creation of map and identifying zipcodes in ecoregions----
 # import the regional shapefile downloaded from state website
-shp_dir <- paste0('../shape_files/WAECY__Ecology_Regions')
+shp_dir <- paste0('./shape_files/WAECY__Ecology_Regions')
 
 eco_region <- readOGR(dsn = shp_dir, layer = 'WAECY__Ecology_Regions')
 # set coord ref system to WGS84 to match projections of ggmap
@@ -253,7 +254,6 @@ bbox <- c(-125, 45, -116.1, 49.5)
 washington_map <- get_map(location= bbox, source = 'stamen',
                           maptype = 'toner', crop = T)
 
-ggmap(washington_map)
 
 # call google terrain map
 #wash_map_terrain <- get_map(location = "washington state", source = 'google',
@@ -261,78 +261,109 @@ ggmap(washington_map)
 
 
 # fortify washington shape data in to dataframe (need maptools package)
-eco_df <- tidy(eco_region, region = "ECY_REGION") %>% 
+eco_df <- tidy(eco_region, region = "ECY_REGION") 
 
 # summary(wash_zip_df)
 
+# creation of eco region map (may change colors)
 eco_region_map <- ggmap(washington_map) + 
   geom_polygon(data = eco_region, aes(x=long, y=lat, group = group, fill = group), color = "black", alpha = 0.5) +
-  scale_fill_manual(values = c("#4CDEF5","#841983","#A4D555","#FF5992")) +
-  #geom_point(data = fire_loc, aes(x = Longitude, y = Latitude, shape = "Fire Locations"), 
-  #           colour = "red") +
-  scale_shape_manual(values = 24) +
+  scale_fill_manual(name = "Ecology Regions",
+                    values = c("blue","purple","red","yellow"), 
+                    labels = c("Southwest", "Northwest", "Central", "Eastern"),
+                    guide = guide_legend(title.position = "top")) +
+  geom_point(data = fire_loc, aes(x = Longitude, y = Latitude, shape = "Fire Locations"), 
+             color = "red", fill = "red") +
+  scale_shape_manual(name = "", values = 24, 
+                     guide = guide_legend(title.position = "top")) +
+  ggtitle("Washington State Ecology Regional Office Jurisdiction") +
   theme(axis.text.x=element_blank(),
         axis.text.y=element_blank(),
         axis.ticks=element_blank(),
         axis.title.x=element_blank(),
-        axis.title.y=element_blank())
+        axis.title.y=element_blank(),
+        title = element_text(vjust = 2),
+        legend.position = "bottom")
 
-print(eco_region_map)
+#print(eco_region_map)
 
+# import washington zip shapefile ----
+zip_path <- paste0('./shape_files/wash_zip_2012_shapefile')
+
+wash_zip_map <- readOGR(dsn = zip_path, layer = "wash_zip_2012_shapefile")
+
+# change projection to match eco region
+wash_zip_map <- spTransform(wash_zip_map, "+proj=longlat +datum=WGS84")
+
+#summary(eco_region)
+#summary(wash_zip_map)
+
+# check overlay visually 
+#plot(eco_region, lwd = 5)
+#plot(wash_zip_map, add = T)
+
+# find the eco regions that are over a zipcode
+zip_eco_region_overlap <- over(wash_zip_map, eco_region)
+# output zip IDs from zip shapefile
+ZIPCODE <- as.character(wash_zip_map@data$ZCTA5CE10)
+# join eco region ids with zip (can be used to indicate eco region)
+zip_eco_region <- cbind(ZIPCODE, zip_eco_region_overlap) %>% 
+  mutate(eco_region = ifelse(ECY_REGION == "CRO", "Central",
+                      ifelse(ECY_REGION == "ERO", "Eastern",
+                      ifelse(ECY_REGION == "NWRO", "Northwestern",
+                      ifelse(ECY_REGION == "SWRO", "Southwestern", NA))))) %>%  
+  select(-OBJECTID, -ECY_REGION) 
+
+# range of PM values for each day in each eco region for each method ----
 # find the min, median, and max values for each date
 #summary(filter(zip_pm, date == "2012-07-9")) # quick sum of first zip obs 
+# zip_pm zipcode needs to be character to join with region
+zip_pm$ZIPCODE <- as.factor(zip_pm$ZIPCODE)
 
+glimpse(zip_pm)
+# these joins should really be done in a loop, but...
+# each column would need to be specified for each pm val, 
+# which I'd have to think about more than just each one manually
 # wrf smoke
-wrf_range <- zip_pm %>% group_by(date) %>% 
-  mutate(ln_wrf_smk = log(wrf_smk_pm + 0.5)) %>% 
-  summarise(min = min(ln_wrf_smk, na.rm = T), 
-            med = median(ln_wrf_smk, na.rm = T), 
-            max = max(ln_wrf_smk, na.rm = T)) %>% 
+wrf_range <- zip_pm %>% 
+  full_join(zip_eco_region, by = "ZIPCODE") %>%  
+  group_by(date, eco_region) %>% 
+  summarise(min = min(wrf_smk_pm, na.rm = T), 
+            med = median(wrf_smk_pm, na.rm = T), 
+            max = max(wrf_smk_pm, na.rm = T)) %>% 
+  # variable for small multiples
   mutate(est_method = "wrf_smk")
 
 # krig smoke
-krig_range <- zip_pm %>% group_by(date) %>% 
-  mutate(ln_krig_smk = log(krig_smk_pm + 0.5)) %>% 
-  summarise(min = min(ln_krig_smk, na.rm = T), 
-            med = median(ln_krig_smk, na.rm = T), 
-            max = max(ln_krig_smk, na.rm = T)) %>% 
+krig_range <- zip_pm %>% 
+  full_join(zip_eco_region, by = "ZIPCODE") %>%  
+  group_by(date, eco_region) %>% 
+  summarise(min = min(krig_smk_pm, na.rm = T), 
+            med = median(krig_smk_pm, na.rm = T), 
+            max = max(krig_smk_pm, na.rm = T)) %>% 
   mutate(est_method = "krig_smk")
 
-# global smoke
-global_range <- zip_pm %>% group_by(date) %>% 
-  mutate(ln_global_smk = log(global_smk_pm + 0.5)) %>% 
-  summarise(min =min(ln_global_smk, na.rm = T), 
-            med =median(ln_global_smk, na.rm = T), 
-            max =max(ln_global_smk, na.rm = T)) %>% 
-  mutate(est_method = "global_smk")
-
 # geo smoke
-geo_range <- zip_pm %>% group_by(date) %>% 
-  mutate(ln_geo_smk = log(geo_smk_pm + 0.5)) %>% 
-  summarise(min = min(ln_geo_smk, na.rm = T), 
-            med = median(ln_geo_smk, na.rm = T), 
-            max = max(ln_geo_smk, na.rm = T)) %>% 
+geo_range <- zip_pm %>% 
+  full_join(zip_eco_region, by = "ZIPCODE") %>%  
+  group_by(date, eco_region) %>% 
+  summarise(min = min(geo_smk_pm, na.rm = T), 
+            med = median(geo_smk_pm, na.rm = T), 
+            max = max(geo_smk_pm, na.rm = T)) %>% 
   mutate(est_method = "geo_smk")
 
-# bind all rows to make a small-multiples graph
-pm_range <- wrf_range %>% bind_rows(krig_range) %>% 
-  bind_rows(global_range) %>% bind_rows(geo_range) 
+# I can loop plots though
 
-# preserve order of estimation method
-pm_range$est_method <- factor(pm_range$est_method,
-                        levels = unique(pm_range$est_method))
-
-# plot
-plot_2_print<- ggplot(pm_range, aes(x = date)) +
-  geom_ribbon(aes(ymin = min, ymax = max), alpha = 0.3) +
-  # can't quite figure out fill yet
-  #scale_fill_manual(values = c("wrf_smk" = "red", 
-  #                             "krig_smk" = "blue", 
-  #                             "global_smk" = "green", 
-  #                             "geo_smk" = "purple")) +
-  geom_line(aes(y = med)) +
-  facet_wrap(~ est_method) +
-  ylab(expression('Natural-Log Smoke PM2.5 µg/m'^3)) +
+# create plot for WRF-Chem
+wrf_plot <- ggplot(wrf_range, aes(x = date)) +
+  geom_ribbon(aes(ymin = min, ymax = max, group = eco_region, fill=eco_region), alpha =0.5) +
+  #geom_line(aes(y=med, group=eco_region, color=eco_region)) +
+  scale_fill_manual(name = "Washington State Ecology \n Regional Office Jurisdiction",
+                    values = c("blue","purple","red","yellow"),
+                    labels = c("Southwest", "Northwest", "Central", "Eastern"),
+                    guide = F) +
+  ggtitle("WRF-Chem") +
+  ylab(expression('Smoke PM2.5 µg/m'^3)) +
   xlab('Date') + 
   theme(panel.background = element_rect(fill = 'white', colour = 'black'),
     panel.grid.major = element_blank(),
@@ -345,8 +376,9 @@ plot_2_print<- ggplot(pm_range, aes(x = date)) +
     #legend.text = element_text(size = 12),
     #legend.title = element_text(size = 14))
 
+wrf_plot
 
-print(plot_2_print)
+plot_grid(eco_region_map, wrf_plot, align = "h")
 
 
 ```

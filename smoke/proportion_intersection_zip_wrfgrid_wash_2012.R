@@ -20,15 +20,18 @@ summary(smoke_grid) # has 1107 here
 plot(smoke_grid) # check out the grid
 
 # Zipcode shapefile
-us_dir <- paste0('./washington/smoke/us_census_shapes/tl_2012_us_zcta510')
+shp_dir <- paste0('C:/Users/RGan/Google Drive/CSU/wild_fire/shape_files/',
+                  'us_census_shapes/tl_2012_us_zcta510')
 
-us_zip_2012 <- readOGR(dsn = us_dir, layer = 'tl_2012_us_zcta510')
+
+us_zip_2012 <- readOGR(dsn = shp_dir, layer = 'tl_2012_us_zcta510')
 summary(us_zip_2012)
-
 # read in CHARS zip code file so I can subset the larger US shapefile to just
 # Washington state
 
-zip_file <- paste0("./washington/smoke/wash_zip_2012.csv")
+zip_file <- paste0('C:/Users/RGan/Google Drive/CSU/wildfire/washington',
+                   '/smoke/wash_zip_2012.csv')
+
 chars_zip_2012 <- read_csv(zip_file)
 chars_zip_2012 <- chars_zip_2012[,2:3]
 chars_zip_2012$ZIPCODE <- as.character(chars_zip_2012$ZIPCODE)
@@ -41,7 +44,18 @@ chars_zip_2012 <- filter(chars_zip_2012, ZIPCODE != '99998')
 wash_zip_map <- us_zip_2012[us_zip_2012$ZCTA5CE10 %in% chars_zip_2012$ZIPCODE,]
 
 # output zipcodes from washington zipcode map to bind values to
- 
+# plot map to check
+plot(wash_zip_map)
+
+# saving wash shapefile ----
+# save shapefile to use in future work
+summary(wash_zip_map)
+
+# save the washington zips to a shapefile to use later
+# create save path
+save_path <- paste0('C:/Users/RGan/Google Drive/CSU/wild_fire/shape_files')
+
+writeOGR(wash_zip_map, layer = 'wash_zip_2012_shapefile', save_path, driver = "ESRI Shapefile")
 
 # Set coordinate reference system for smoke gird
 nad83 <- '+proj=longlat +datum=NAD83 +no_defs +ellps=GRS80 +towgs84=0,0,0'
