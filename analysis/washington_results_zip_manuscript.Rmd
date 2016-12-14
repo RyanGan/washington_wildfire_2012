@@ -30,13 +30,12 @@ Note, epidemiological methods that Sheryl and I think can improve our estimation
 
 ```{r data import, include = F, echo = FALSE}
 # Set working directory and read in files --------------------------------------
-# direct path for mac
-#path <- paste0("/Users/ryangan/Documents/local_git_repo/wildfire_washington/",
-#        "analysis/analysis_data")
+# relative path
+path <- paste0("./analysis_data")
 
 # direct path for pc
-path <- paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
-               "wildfire_washington/analysis/analysis_data")
+#path <- paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
+#               "wildfire_washington/analysis/analysis_data")
 
 # Infile case-crossover dataframes ---------------------------------------------
 # Dataframes made in 'chars_3month_binary_smoke_may2016 script
@@ -115,7 +114,7 @@ zip_met <- read_csv("./analysis_data/wa_zip_exp_0710_2012_ryan.csv") %>%
   mutate(date = as.Date(date, "%d%B%Y"))
 
 
-# note 12/4/16: read_csv is pretty slow, fread doesn't import date variable 
+# note 12/4/16: read_csv is pretty slow on pc, fread doesn't import date variable 
 # that well. Solution may be to use fread but convert to date to use later
 
 ```
@@ -231,12 +230,54 @@ plot(zip_pm_time_series)
 
 I believe using county-level time-series might be a bit confusing, and there are way too many zip codes to create small-multiples time-series. Sheryl proposed a range of min, median, and max values of the zip codes over time. I think that would work well. I decided on a natural-log transformation of the values as it was impossible to see the median values as the max values were so high, making the y scale high. Here I use the smoke variables, but it would be worth considering if we should present the values not accounting for smoke instead.
 
-#### Natural-Log Transformed Smoke PM~2.5~ Timeseries 
+#### Region-Specific Smoke PM~2.5~ Timeseries 
 
-Figures below are for each smoke PM~2.5~ estimation method. The figures are the daily range (min and max) and median values for each zip code in the state. Jeff noticed that the geo smoke, global, and krig models all have some increased bumps indicating smoke exposure in time periods where that may not be the case (WRF model does not show it). I thought I may have coded something wrong as I added a small value (0.5) to all smoke estimates to avoid logging a 0 value, but that doesn't seem to be the case. I think it might have to do with the subtraction of the 'background' values and will explore this further.
+Figures below are for each smoke PM~2.5~ estimation method. The figures are the daily range (min and max) for each zip code in a specific region of the state. The figure first starts out by showing the map of the state, divided in to eco regions used by the state for organization purposes. 
 
 ```{r smk time series range, echo = F, results='asis', message=F}
 
+# import the regional shapefile downloaded from state website
+shp_dir <- paste0('../shape_files/WAECY__Ecology_Regions')
+
+eco_region <- readOGR(dsn = shp_dir, layer = 'WAECY__Ecology_Regions')
+# set coord ref system to WGS84 to match projections of ggmap
+eco_region <- spTransform(eco_region, "+proj=longlat +datum=WGS84")
+
+summary(eco_region) # projection is GRS80, may be off
+
+# ggmap and rgdal needed
+# Set base map boundary layer
+bbox <- c(-125, 45, -116.1, 49.5)
+
+# call black and white map
+washington_map <- get_map(location= bbox, source = 'stamen',
+                          maptype = 'toner', crop = T)
+
+ggmap(washington_map)
+
+# call google terrain map
+#wash_map_terrain <- get_map(location = "washington state", source = 'google',
+#                             maptype = 'terrain', crop = F)
+
+
+# fortify washington shape data in to dataframe (need maptools package)
+eco_df <- tidy(eco_region, region = "ECY_REGION") %>% 
+
+# summary(wash_zip_df)
+
+eco_region_map <- ggmap(washington_map) + 
+  geom_polygon(data = eco_region, aes(x=long, y=lat, group = group, fill = group), color = "black", alpha = 0.5) +
+  scale_fill_manual(values = c("#4CDEF5","#841983","#A4D555","#FF5992")) +
+  #geom_point(data = fire_loc, aes(x = Longitude, y = Latitude, shape = "Fire Locations"), 
+  #           colour = "red") +
+  scale_shape_manual(values = 24) +
+  theme(axis.text.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks=element_blank(),
+        axis.title.x=element_blank(),
+        axis.title.y=element_blank())
+
+print(eco_region_map)
 
 # find the min, median, and max values for each date
 #summary(filter(zip_pm, date == "2012-07-9")) # quick sum of first zip obs 
