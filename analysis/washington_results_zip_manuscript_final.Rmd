@@ -175,7 +175,7 @@ eco_region_map <- ggmap(washington_map) +
              color = "red", fill = "red") +
   scale_shape_manual(name = "", values = 24, 
                      guide = guide_legend(title.position = "top", order = 2)) +
-  ggtitle("Washington State Ecology Regional Office Jurisdiction") +
+  ggtitle("Washington State Ecology \n Regional Office Jurisdiction") +
   theme(axis.text.x=element_blank(),
         axis.text.y=element_blank(),
         axis.ticks=element_blank(),
@@ -295,8 +295,9 @@ assign(paste0(name,"_plot"), plot_print)
 # but this should be good enough for a review by CDC
 
 
-plot_grid(eco_region_map, wrf_plot, krig_plot, geo_plot)
-
+map_timeseries <- plot_grid(eco_region_map, wrf_plot, krig_plot, geo_plot)
+save_plot("map_timeseries.pdf", map_timeseries, 
+          ncol = 2, nrow = 2)
 
 ```
 
