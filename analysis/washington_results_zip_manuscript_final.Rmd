@@ -219,7 +219,7 @@ zip_eco_region <- cbind(ZIPCODE, zip_eco_region_overlap) %>%
 # zip_pm zipcode needs to be character to join with region
 zip_pm$ZIPCODE <- as.factor(zip_pm$ZIPCODE)
 
-glimpse(zip_pm)
+# glimpse(zip_pm)
 # these joins should really be done in a loop, but...
 # each column would need to be specified for each pm val, 
 # which I'd have to think about more than just each one manually
