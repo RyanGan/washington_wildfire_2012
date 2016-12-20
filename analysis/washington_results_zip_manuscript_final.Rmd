@@ -145,7 +145,7 @@ eco_region <- readOGR(dsn = shp_dir, layer = 'WAECY__Ecology_Regions')
 # set coord ref system to WGS84 to match projections of ggmap
 eco_region <- spTransform(eco_region, "+proj=longlat +datum=WGS84")
 
-summary(eco_region) # projection is GRS80, may be off
+# summary(eco_region) # projection is GRS80, may be off
 
 # ggmap and rgdal needed
 # Set base map boundary layer
