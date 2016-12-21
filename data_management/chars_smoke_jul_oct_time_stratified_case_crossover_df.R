@@ -198,6 +198,12 @@ chars_2012_conf_df <- read_csv(read)
 # check data
 glimpse(chars_2012_conf_df)
 
+# find how many admissions overall were during the july 1 to oct31 timeframe
+n_period <- chars_2012_conf_df %>% 
+  filter(ADM_DATE >= "2012-07-01" & ADM_DATE <= "2012-10-31") %>% 
+  nrow()
+
+n_period
 # look up admit type, may want to subset to specifc admit
 # ADM_TYPE variable: 1 = emergency, 2 = urgent, 3 = elective, 4 = newborn
 # 5 = trauma, 9 = info not available
