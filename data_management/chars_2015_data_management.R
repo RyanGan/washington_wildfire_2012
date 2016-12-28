@@ -90,4 +90,4 @@ check
 
 id <- chars_2015_conf_df %>% filter(PATIENTID == 1144844)
 
-summary(id)
+glimpse(id)
