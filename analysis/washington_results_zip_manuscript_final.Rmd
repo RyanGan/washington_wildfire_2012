@@ -32,7 +32,7 @@ Note, epidemiological methods that Sheryl and I think can improve our estimation
 # Set working directory and read in files --------------------------------------
 # relative path
 
-path <- paste0("./analysis_data")
+path <- paste0("./analysis/analysis_data")
 
 # direct path for pc
 #path <- paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
@@ -100,14 +100,14 @@ broken_arm_casecross <- read_csv(paste(path,
 
 # read zip pm for counts by zip
 
-zip_pm <- read_csv("../smoke/pm_data/zip_pm_to_merge_with_chars.csv")
+zip_pm <- read_csv("./smoke/pm_data/zip_pm_to_merge_with_chars.csv")
 
 # read locations of fires
-fire_loc <- read_csv("./analysis_data/washington_fires_locations201209.csv")
+fire_loc <- read_csv("./analysis/analysis_data/washington_fires_locations201209.csv")
 
 
 # import the zip-level met data files Rish sent
-zip_met <- read_csv("./analysis_data/wa_zip_exp_0710_2012_ryan.csv") %>% 
+zip_met <- read_csv("./analysis/analysis_data/wa_zip_exp_0710_2012_ryan.csv") %>% 
   # define date variable; original character looked like: 01JUL2012
   mutate(date = as.Date(date, "%d%B%Y"))
 
@@ -137,13 +137,13 @@ Figures below are for each smoke PM~2.5~ estimation method. The figures are the 
 
 # creation of map and identifying zipcodes in ecoregions----
 # import the regional shapefile downloaded from state website
-shp_dir <- paste0('../shape_files/WAECY__Ecology_Regions')
+shp_dir <- paste0('./shape_files/WAECY__Ecology_Regions')
 
 eco_region <- readOGR(dsn = shp_dir, layer = 'WAECY__Ecology_Regions')
 # set coord ref system to WGS84 to match projections of ggmap
 eco_region <- spTransform(eco_region, "+proj=longlat +datum=WGS84")
 
-summary(eco_region) # projection is GRS80, may be off
+# summary(eco_region) # projection is GRS80, may be off
 
 # ggmap and rgdal needed
 # Set base map boundary layer
@@ -187,7 +187,7 @@ eco_region_map <- ggmap(washington_map) +
 #print(eco_region_map)
 
 # import washington zip shapefile ----
-zip_path <- paste0('../shape_files/wash_zip_2012_shapefile')
+zip_path <- paste0('./shape_files/wash_zip_2012_shapefile')
 
 wash_zip_map <- readOGR(dsn = zip_path, layer = "wash_zip_2012_shapefile")
 
@@ -219,7 +219,7 @@ zip_eco_region <- cbind(ZIPCODE, zip_eco_region_overlap) %>%
 # zip_pm zipcode needs to be character to join with region
 zip_pm$ZIPCODE <- as.factor(zip_pm$ZIPCODE)
 
-glimpse(zip_pm)
+# glimpse(zip_pm)
 # these joins should really be done in a loop, but...
 # each column would need to be specified for each pm val, 
 # which I'd have to think about more than just each one manually
@@ -254,7 +254,7 @@ geo_range <- zip_pm %>%
 # loop plots though
 
 file_name <- c('wrf', 'krig', 'geo')
-title_name <- c('WRF-Chem', 'Kriged', 'Geo-Weighted')
+title_name <- c('WRF-Chem Smoke', 'Kriging Smoke', 'GWR Smoke')
 ts_list <- list(wrf_range, krig_range, geo_range)
 
 for(i in 1:3){
@@ -296,9 +296,9 @@ assign(paste0(name,"_plot"), plot_print)
 
 
 map_timeseries <- plot_grid(eco_region_map, wrf_plot, krig_plot, geo_plot)
-save_plot("map_timeseries.pdf", map_timeseries, 
-          ncol = 2, nrow = 2)
-
+#save_plot("map_timeseries.pdf", map_timeseries, 
+#          ncol = 2, nrow = 2)
+plot(map_timeseries)
 ```
 
 
@@ -340,7 +340,8 @@ print_map <- ggmap(washington_map) +
   geom_polygon(data = wash_zip_df, 
     aes(x=long, y=lat, group = group, fill = geo_smk10_days), alpha = 0.6) +
   scale_fill_gradient(expression("Number of \nSmoke Days"),
-    low = 'white', high = 'black', guide = guide_legend(title.position = "top", order = 1)) +
+    low = '#061161', high = '#780206', 
+    guide = guide_legend(title.position = "top", order = 1)) +
   geom_point(data = fire_loc, aes(x = Longitude, y = Latitude, shape = "Fire Locations"), 
              colour = "red", fill = "red") +
   scale_shape_manual(name = "", values = 24, 
@@ -350,7 +351,8 @@ print_map <- ggmap(washington_map) +
         axis.text.y=element_blank(),
         axis.ticks=element_blank(),
         axis.title.x=element_blank(),
-        axis.title.y=element_blank())
+        axis.title.y=element_blank(),
+        axis.line = element_blank())
 
 print(print_map)
 
@@ -733,7 +735,7 @@ combined_point_est_df$p_val <- as.numeric(combined_point_est_df$p_val)
 
 # subset out global method
 combined_point_est_df <- combined_point_est_df %>% 
-  filter(pm_method != "Global Smoke")
+  filter(pm_method != "Global Smoke") 
 
 ## ggplot
   print_plot <- ggplot(combined_point_est_df, 
@@ -969,14 +971,22 @@ wrf_geo_age <- combined_point_est_df %>%
 wrf_geo_age_plot <- combined_point_est_df %>% 
   # filter columns to just geo-smk
   filter(pm_method == "GWR Smoke" | pm_method == "WRF-Chem Smoke") %>% 
-  mutate(age_cat2 = ifelse(age_cat == 0, "<15", 
+  # do not plot results with less than 15 events, create missing vals
+  # in mutate
+  mutate(odds_ratio = ifelse(as.numeric(n_events) < 15, 
+                             99, odds_ratio),
+         lower95 = ifelse(as.numeric(n_events) < 15, 
+                             99, lower95),
+         upper95 = ifelse(as.numeric(n_events) < 15, 
+                             99, upper95),
+         age_cat2 = ifelse(age_cat == 0, "<15", 
                     ifelse(age_cat == 1, "15-65",
                     ifelse(age_cat == 2, ">65", NA)))) %>% 
   # subset columns I want to put in to the table
   select(1, 3, 11, 5:8) %>% 
   mutate(odds_ratio = ifelse(odds_ratio == 99, NA, odds_ratio),
          lower95 = ifelse(lower95 == 99, NA, lower95),
-         upper95 = ifelse(upper95 == 99, NA, upper95))  
+         upper95 = ifelse(upper95 == 99, NA, upper95))
 
 # change characters to numeric and factor  
 wrf_geo_age_plot$outcome <- factor(wrf_geo_age_plot$outcome,
