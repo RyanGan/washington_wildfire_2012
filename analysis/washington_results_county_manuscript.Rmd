@@ -32,8 +32,7 @@ Rish wanted a couple key things
 ```{r data import, include = F, echo = FALSE}
 # Set working directory and read in files --------------------------------------
 # direct path for mac
-path <- paste0("/Users/ryangan/Documents/local_git_repo/wildfire_washington/",
-        "analysis/analysis_data")
+path <- paste0("./analysis/analysis_data")
 
 # direct path for pc
 #path <- paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
@@ -97,10 +96,10 @@ broken_arm_casecross <- read_csv(paste(path,
                                        sep="/"))
 
 # read county smoke pm for figures with FIPS codes
-county_pm <- read_csv("../smoke/pm_data/wa_county_fips_pop_wt_pm.csv") 
+county_pm <- read_csv("./smoke/pm_data/wa_county_fips_pop_wt_pm.csv") 
 
 # read locations of fires
-fire_loc <- read_csv("../smoke/pm_data/washington_fires201209.csv")
+fire_loc <- read_csv("./smoke/pm_data/washington_fires201209.csv")
 
 # import the county-level met data files Rish sent
 county_met <- read_csv("./analysis_data/wa_cty_exp_0710_2012_ryan.csv") %>% 
@@ -125,13 +124,13 @@ These figures represented the population-weighted PM~2.5~ for each county for WR
 
 ```{r pm time series plot, echo = F, results='asis'}
 
-
 print_plot <-ggplot(county_pm, aes(x = date)) + 
   scale_x_date(date_labels = '%m')+ # having issues with the date scale
   geom_point(aes(y = wrf_pm, colour = 'WRF-Chem'), size = 0.75) + 
-  geom_point(aes(y = geo_wt_pm, colour = 'Geo-Weight'), size = 0.75) +
+  geom_point(aes(y = geo_wt_pm, colour = 'Geo-Weight'), size = 0.75) + 
+  geom_point(aes(y = krig_pm, colour = 'Krig'), size = 0.75) +
   # custom colour
-  scale_colour_manual(name='Method', values= c("red", "blue")) +
+  scale_colour_manual(name='Method', values= c("red", "blue", "green")) +
   facet_wrap(~county) + 
   ggtitle(expression('Washington Counties PM2.5 µg/m'^3, ' by Date')) +
   ylab(expression('Population-Weighted PM2.5 µg/m'^3)) +
@@ -140,35 +139,35 @@ print_plot <-ggplot(county_pm, aes(x = date)) +
     panel.grid.major = element_blank(),
     panel.grid.minor = element_blank(),
     axis.title.y = element_text(angle = 90),
-    axis.title.y = element_text(angle = 90),
     # facet themes
     strip.background = element_rect(fill = 'white')) 
 
-# make a plot for Chelan only
-chelan_pm <- county_pm %>% filter(county == "Chelan")
-# Chelan plot
-chelan_pm_times_serie <- ggplot(county_pm, aes(x = date)) + 
-  #scale_x_date(date_labels = '%m')+ # having issues with the date scale
-  geom_jitter(aes(y = wrf_pm, colour = 'WRF-Chem'), size = 0.75) + 
-  geom_jitter(aes(y = geo_wt_pm, colour = 'Geo-Weight'), size = 0.75) +
-  # custom colour
-  scale_colour_manual(name='Method', values= c("red", "blue")) +
-  ggtitle(expression('Chelan County PM2.5 µg/m'^3, ' by Date')) +
-  ylab(expression('Population-Weighted PM2.5 µg/m'^3)) +
-  xlab('Month in 2012') + 
-  theme(panel.background = element_rect(fill = 'white', colour = 'black'),
-    panel.grid.major = element_blank(),
-    panel.grid.minor = element_blank(),
-    axis.title.y = element_text(angle = 90),
-    axis.title.y = element_text(angle = 90),
-    # facet themes
-    strip.background = element_rect(fill = 'white')) 
-
-plot(chelan_pm_times_serie)
-
-ggsave("chelan_pm_timeseries", chelan_pm_times_serie, device = "pdf", width = 9, height = 5)
 
 print(print_plot)
+# 
+# # make a plot for Chelan only
+# chelan_pm <- county_pm %>% filter(county == "Chelan")
+# # Chelan plot
+# chelan_pm_times_series <- ggplot(chelan_pm, aes(x = date)) + 
+#   #scale_x_date(date_labels = '%m')+ # having issues with the date scale
+#   geom_jitter(aes(y = wrf_pm, colour = 'WRF-Chem'), size = 0.75) + 
+#   geom_jitter(aes(y = geo_wt_pm, colour = 'Geo-Weight'), size = 0.75) +
+#   # custom colour
+#   scale_colour_manual(name='Method', values= c("red", "blue")) +
+#   ggtitle(expression('Chelan County PM2.5 µg/m'^3, ' by Date')) +
+#   ylab(expression('Population-Weighted PM2.5 µg/m'^3)) +
+#   xlab('Month in 2012') + 
+#   theme(panel.background = element_rect(fill = 'white', colour = 'black'),
+#     panel.grid.major = element_blank(),
+#     panel.grid.minor = element_blank(),
+#     axis.title.y = element_text(angle = 90),
+#     # facet themes
+#     strip.background = element_rect(fill = 'white')) 
+# 
+# plot(chelan_pm_times_series)
+
+#ggsave("chelan_pm_timeseries", chelan_pm_times_serie, device = "pdf", width = 9, height = 5)
+
 
 ```
 
@@ -226,13 +225,13 @@ wash_county_df <- wa_county %>%
 # create map of smokey counties in washington
 print_map <- ggmap(washington_map) + 
   geom_polygon(data = wash_county_df, 
-    aes(x=long, y=lat, group = group, fill = geo_smk5_days), alpha = 0.6) +
+    aes(x=long, y=lat, group = group, fill = geo_smk10_days), alpha = 0.6) +
   scale_fill_gradient(expression("Number of \nSmoke Days"),
     low = 'white', high = 'black') +
   geom_point(data = fire_loc, aes(x = Longitude, y = Latitude, shape = "Fire Locations"), 
              colour = "red") +
   scale_shape_manual(values = 24) +
-  ggtitle("Days where geo smoke PM2.5 > 5 for \nzip codes from July 1st to October 31st") + 
+  ggtitle("Days where geo smoke PM2.5 > 10 for \nzip codes from July 1st to October 31st") + 
   theme(axis.text.x=element_blank(),
         axis.text.y=element_blank(),
         axis.ticks=element_blank(),
@@ -340,38 +339,6 @@ combined_point_est_df <- bind_rows(datalist)
   print(tab)
 
 ```
-
-### Time-Stratified Case-Crossover (referent period same day of the week within the same month)
-
-The original time-stratified case-crossover design suggested picking referent periods based on any potential time-varying confounding, *a priori*. For example, if day of the week and the month of the exposure sequence is of concern, one might pick referents in the same day of the week and the same day of the month. The papers that discuss and support the use of a time-stratified design are the Janes et al. 2005 **Epidemiology paper**, *Case-Crossover Analyses of Air Pollution Exposure Data; Referent Selection Strategies and Their Implication for Bias*.
-
-The authors state that with the time-stratified design, the *a priori* selection of the referent period on the same day of the week within the same month has the following benefits:
-
-1. Localizable - Meaning that the likelihood of index times conditional on the referent windows contains information about \beta, which I think means the relative difference in the exposed vs unexposed, conditioned on the exposure (air pollution in their example), is unbiased.
-
-2. Non-ignroable - Meaning that time-varying factors can be ignored when using a conditional logistic regression; controlled through design (matching on day of week within the same season). 
-
-More referent periods is better for statistical efficiency, but there is a tradeoff, where additional referent periods may introduce what they call 'overlap bias', which they mathmatically define in Janes 2005 **Statistics in Medicine** paper, *Overlap Bias in the Case-Crossover Design, with Applications to Air Pollution Exposures*. Basically this bias occurs when the exposure assigned in the referent period is conditional on the strategy used to define the referent period.
-
-As Janes et al. state in their 2005 **Statistics in Medicine** paper:
-
-
-  > *Two of the main strengths of the case-crossover design in the air pollution context are
-that it controls fixed confounders and allows for control over time-dependent confounders
-by design. Choosing referents that are restricted to the same day of the week and season
-as the index time will control for these effects. Though we have not examined the degree
-to which various referent selection strategies control bias due to confounding, several points
-are clear. Referents that are closer to the index time will achieve greater control of seasonal
-confounding. However, sampling referents closer to the index time will also result in a loss
-of power due to less heterogeneity in the exposure series, and a smaller number of referents
-will also result in lower power.*
-
-
-I will use both Janes 2005 papers in **Epidemiology** and **Statistics in Medicine** to justify the use of the time-stratified design.
-
-The time-dependent confounders have been what I'm struggling with, as the variation of wildfire smoke depends on a variety of factors, including season. I present a three different scenarios which can be justified in a paper: within month, within season, and within wildfire season.
-
-This design has an advantage over other case-crossover designs I've explored in that you can use more referent times, and as the exposure at these times are averaged for each subject over a set time period, this balances out some of the more extreme values of PM~2.5~ that may persist over a couple weeks due to wildfire smoke. 
 
 ## County-Level Exposure
 
@@ -538,7 +505,7 @@ combined_point_est_df$p_val <- as.numeric(combined_point_est_df$p_val)
     geom_errorbar(aes(ymin=lower95, ymax=upper95), width = 0.2) +
     facet_wrap(~outcome, nrow = 3) +
     geom_hline(yintercept = 1, linetype=2) +
-    ggtitle('County-Level: Association Between PM2.5 \n from Wildfire Smoke on Hospitalizations') +
+    #ggtitle('County-Level: Association Between PM2.5 \n from Wildfire Smoke on Hospitalizations') +
     ylab('Odds Ratio for 10µg/m^3 Increase in PM2.5') +
     xlab('Time-Stratified Within July to October Fire Season') +
     # plot theme
@@ -552,7 +519,6 @@ combined_point_est_df$p_val <- as.numeric(combined_point_est_df$p_val)
     strip.text = element_text(size = 7),
     legend.text = element_text(size = 7),
     # axis element
-    axis.title.y = element_text(angle = 90),
     axis.text.x = element_blank(),
     axis.title.y = element_text(angle = 90))
 
@@ -774,7 +740,6 @@ combined_point_est_df$p_val <- as.numeric(combined_point_est_df$p_val)
     strip.text = element_text(size = 7),
     legend.text = element_text(size = 7),
     # axis element
-    axis.title.y = element_text(angle = 90),
     axis.text.x = element_blank(),
     axis.title.y = element_text(angle = 90))
 
@@ -1362,7 +1327,6 @@ combined_point_est_df$upper95 <- as.numeric(combined_point_est_df$upper95)
     theme(panel.background = element_rect(fill = 'white', colour = 'black'),
     panel.grid.major = element_blank(),
     panel.grid.minor = element_blank(),
-    axis.title.y = element_text(angle = 90),
     axis.text.x = element_blank(),
     axis.title.y = element_text(angle = 90),
     # facet text size
