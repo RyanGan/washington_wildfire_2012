@@ -770,6 +770,99 @@ combined_point_est_df <- combined_point_est_df %>%
     #legend.text = element_text(size = 8))
 
   print(print_plot)
+  
+# figures for research day
+  # plot of only respiratory outcomes
+  
+  xtabs(~ combined_point_est_df$outcome)
+# subset out global method and respiratory outcomes ----
+resp_point_est_df <- combined_point_est_df %>% 
+  filter(pm_method != "Global Smoke") %>% 
+  filter(outcome == "All Respiratory" |
+         outcome == "Asthma" |
+         outcome == "COPD" |
+         outcome == "Pneumonia" |
+         outcome == "Acute Bronchitis" |
+         outcome == "Broken Arm")
+
+## ggplot
+  resp_plot <- ggplot(resp_point_est_df, 
+                      aes(x = pm_method, y = odds_ratio, colour = pm_method)) +
+    # custom color 
+    scale_color_manual(name = "Smoke-Estimation Method", 
+                       values = c("red", "blue", "#32115C"),
+                       guide = guide_legend(title.position = "top", title.hjust = 0.5)) +
+    geom_point() + #geom_text(vjust = 0, nudge_x = 0.3) +
+    geom_errorbar(aes(ymin=lower95, ymax=upper95), width = 0.2) +
+    facet_wrap(~outcome, nrow = 2) +
+    geom_hline(yintercept = 1, linetype=2) +
+#    ggtitle('Association Between PM2.5 \n from Wildfire Smoke on Hospitalizations') +
+    ylab(expression(paste("Odds Ratio for 10µg/m"^3, " Increase in PM"[2.5]))) +
+    #xlab('Smoke Estimation Method') +
+    # plot theme
+    theme(panel.background = element_rect(fill = 'white', colour = 'black'),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    # strip element
+    strip.background = element_rect(colour=NA, fill=NA),
+    panel.border = element_rect(fill = NA, color = "black"),
+    # facet text size
+    #strip.text = element_text(size = 8),
+    # axis element
+    axis.text.x = element_blank(),
+    axis.title.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.title.y = element_text(angle = 90),
+    # legend elements
+    legend.position = "bottom")
+    #legend.text = element_text(size = 8))
+
+  print(resp_plot)
+
+# subset out global method and respiratory outcomes ----
+cvd_point_est_df <- combined_point_est_df %>% 
+  filter(pm_method != "Global Smoke") %>% 
+  filter(outcome == "Cardiovascular Disease" |
+         outcome == "Arrhythmia" |
+         outcome == "Cerebrovascular Disease" |
+         outcome == "Heart Failure" |
+         outcome == "Ischemic Heart Disease" |
+         outcome == "Myocardial Infarction")
+
+## ggplot
+  cvd_plot <- ggplot(cvd_point_est_df, 
+                      aes(x = pm_method, y = odds_ratio, colour = pm_method)) +
+    # custom color 
+    scale_color_manual(name = "Smoke-Estimation Method", 
+                       values = c("red", "blue", "#32115C"),
+                       guide = guide_legend(title.position = "top", title.hjust = 0.5)) +
+    geom_point() + #geom_text(vjust = 0, nudge_x = 0.3) +
+    geom_errorbar(aes(ymin=lower95, ymax=upper95), width = 0.2) +
+    facet_wrap(~outcome, nrow = 2) +
+    geom_hline(yintercept = 1, linetype=2) +
+#    ggtitle('Association Between PM2.5 \n from Wildfire Smoke on Hospitalizations') +
+    ylab(expression(paste("Odds Ratio for 10µg/m"^3, " Increase in PM"[2.5]))) +
+    #xlab('Smoke Estimation Method') +
+    # plot theme
+    theme(panel.background = element_rect(fill = 'white', colour = 'black'),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    # strip element
+    strip.background = element_rect(colour=NA, fill=NA),
+    panel.border = element_rect(fill = NA, color = "black"),
+    # facet text size
+    #strip.text = element_text(size = 8),
+    # axis element
+    axis.text.x = element_blank(),
+    axis.title.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.title.y = element_text(angle = 90),
+    # legend elements
+    legend.position = "bottom")
+    #legend.text = element_text(size = 8))
+
+  print(cvd_plot)
+  
     
 ```
 
