@@ -12,7 +12,7 @@ library(ggplot2) # graphics
 
 # Set working directory and read in files --------------------------------------
 # Relative path 
-wd_path <- paste0("./washington/case_crossover_dataframes")
+wd_path <- paste0("./analysis/analysis_data")
 
 setwd(wd_path)
 getwd()

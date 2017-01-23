@@ -17,9 +17,11 @@ chars_2012_conf_df <- read_csv(path)
 glimpse(chars_2012_conf_df)
 # parsing failure at row 738152; check it out
 parse_check <- chars_2012_conf_df[738152, ]
- # Patient ID is missing; might not be a problem
+# Patient ID is missing; might not be a problem
 glimpse(parse_check)
 
+#look for delivery
+baby <- filter(chars_2012_conf_df, DIAG1 == "650")
 
 # use cms.gov to look up icd9 codes if you need help
 
