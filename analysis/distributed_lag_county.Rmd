@@ -1,0 +1,71 @@
+---
+title: "Distributed Lag Model"
+author: "Ryan_Gan"
+date: "January 24, 2017"
+output: html_document
+---
+
+Trying out distributed lag models using the 'dlnm' package.
+
+```{r libraries used}
+
+library(tidyverse) # data wrangle package
+library(dlnm) # distributed lag models
+library(lme4) # random-effects model
+library(broom) # broom for tidy data from stats models
+library(splines) # spline library
+
+```
+
+
+```{r county time series import}
+# file path
+file_path <- paste0("./analysis/analysis_data/wa_2012_county_time_series.csv")
+
+# read file
+wash_ts_df <- read_csv(file_path)
+
+summary(wash_ts_df)
+
+```
+
+
+```{r basic time series}
+
+# using asthma as an example
+mixed_mod <- tidy(glmer(asthma_n ~ geo_smk_pm + (1|county), 
+                        wash_ts_df, family = "poisson"))
+
+mixed_mod
+
+```
+
+General interpretation would be for a 1 ug/m^3 increase in smoke PM2.5, astham events increase by 1%.
+
+```{r simple dlm}
+
+cb1.pm <- crossbasis(wash_ts_df$geo_wt_pm, lag = 15, argvars=list(fun="lin"),
+                     arglag=list(fun="poly", degree=5))
+
+summary(cb1.pm)
+
+model1 <- glm(asthma_n ~ cb1.pm ,
+              family=quasipoisson(), wash_ts_df)
+
+summary(model1)
+
+
+pred1.pm <- crosspred(cb1.pm, model1, at=0:20, bylag=0.2, cumul=TRUE)
+
+plot(pred1.pm, "slices", var=10, col=3, ylab="RR", ci.arg=list(density=15,lwd=2),
+main="Association with a 1-unit increase in PM2.5")
+
+
+plot(pred1.pm, "slices", var=10, col=2, cumul=TRUE, ylab="Cumulative RR",
+main="Cumulative association with a 1-unit increase in PM2.5")
+
+
+
+```
+
+
