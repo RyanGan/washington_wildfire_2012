@@ -166,25 +166,23 @@ eco_df <- tidy(eco_region, region = "ECY_REGION")
 
 # creation of eco region map (may change colors)
 eco_region_map <- ggmap(washington_map) + 
-  geom_polygon(data = eco_region, aes(x=long, y=lat, group = group, fill = group), color = "black", alpha = 0.5) +
+  geom_polygon(data = eco_region, aes(x=long, y=lat, group = group, fill = group), color = "black", alpha = 0.8) +
   scale_fill_manual(name = "Ecology Regions",
-                    values = c("blue","purple","red","yellow"), 
+                    values = c("#2c7bb6","#abd9e9","#d7191c","#fdae61"), 
                     labels = c("Southwest", "Northwest", "Central", "Eastern"),
                     guide = guide_legend(title.position = "top", order = 1)) +
   geom_point(data = fire_loc, aes(x = Longitude, y = Latitude, shape = "Fire Locations"), 
-             color = "red", fill = "red") +
+             color = "black", fill = "red") +
   scale_shape_manual(name = "", values = 24, 
                      guide = guide_legend(title.position = "top", order = 2)) +
   ggtitle("Washington State Ecology \n Regional Office Jurisdiction") +
-  theme(axis.text.x=element_blank(),
-        axis.text.y=element_blank(),
-        axis.ticks=element_blank(),
-        axis.title.x=element_blank(),
-        axis.title.y=element_blank(),
-        title = element_text(vjust = 2),
-        legend.position = "right")
+  xlab("Longitude") +
+  ylab("Latitude") +
+  theme(#legend.position = "bottom",
+        #legend.box = "horizontal"
+    )
 
-#print(eco_region_map)
+print(eco_region_map)
 
 # import washington zip shapefile ----
 zip_path <- paste0('./shape_files/wash_zip_2012_shapefile')
@@ -267,7 +265,7 @@ gg_title <- title_name[i]
 plot_print <- ggplot(df_range, aes(x = date)) +
   geom_ribbon(aes(ymin = min, ymax = max, group = eco_region, fill=eco_region), alpha = 0.7) +
   scale_fill_manual(name = "Washington State Ecology \n Regional Office Jurisdiction",
-                    values = c("red", "yellow", "purple", "blue"),
+                    values = c("#d7191c", "#fdae61", "#abd9e9", "#2c7bb6"),
                     labels = c("Central", "Eastern","Northwest", "Southwest"),
                     guide = F) +
   ylim(0,500) +
@@ -293,12 +291,16 @@ assign(paste0(name,"_plot"), plot_print)
 
 # Layout needs to be edited and I would like to change colors
 # but this should be good enough for a review by CDC
+map_timeseries <- ggdraw() +
+  draw_plot(eco_region_map, x = 0, y = 0.5, width = 0.5, height = 0.5) +
+  draw_plot(wrf_plot, x = 0.5, y = 0.5, width = 0.5, height = 0.5) +
+  draw_plot(krig_plot, x = 0, y = 0, width = 0.5, height = 0.5) +
+  draw_plot(geo_plot, x = 0.5, y = 0, width = 0.5, height = 0.5)
 
 
-map_timeseries <- plot_grid(eco_region_map, wrf_plot, krig_plot, geo_plot)
-#save_plot("map_timeseries.pdf", map_timeseries, 
-#          ncol = 2, nrow = 2)
 plot(map_timeseries)
+
+
 ```
 
 
@@ -338,21 +340,23 @@ wash_zip_df <- tidy(wash_zip_map, region = "ZCTA5CE10") %>%
 # map
 print_map <- ggmap(washington_map) + 
   geom_polygon(data = wash_zip_df, 
-    aes(x=long, y=lat, group = group, fill = geo_smk10_days), alpha = 0.6) +
+    aes(x=long, y=lat, group = group, fill = geo_smk10_days), alpha = 0.7) +
   scale_fill_gradient(expression("Number of \nSmoke Days"),
-    low = '#061161', high = '#780206', 
+    low = '#2c7bb6', high = '#d7191c', 
     guide = guide_legend(title.position = "top", order = 1)) +
   geom_point(data = fire_loc, aes(x = Longitude, y = Latitude, shape = "Fire Locations"), 
-             colour = "red", fill = "red") +
+             colour = "black", fill = "red") +
   scale_shape_manual(name = "", values = 24, 
                      guide = guide_legend(title.position = "top", order = 2)) +
+  xlab("Longitude") +
+  ylab("Latitude") # +
   #ggtitle("Days where geo smoke PM2.5 > 10 for \nzip codes from July 1st to October 31st") + 
-  theme(axis.text.x=element_blank(),
-        axis.text.y=element_blank(),
-        axis.ticks=element_blank(),
-        axis.title.x=element_blank(),
-        axis.title.y=element_blank(),
-        axis.line = element_blank())
+  #theme(axis.text.x=element_blank(),
+        #axis.text.y=element_blank(),
+        #axis.ticks=element_blank(),
+        #axis.title.x=element_blank(),
+        #axis.title.y=element_blank(),
+        #axis.line = element_blank())
 
 print(print_map)
 
