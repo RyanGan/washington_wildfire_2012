@@ -88,7 +88,11 @@ ggplot(wash_jul_oct_ts_df, aes(x = geo_smk_pm_unit10, y = resp_n_wo_miss)) +
   geom_point() +
   facet_wrap(~county)
 
-glimpse(wash_jul_oct_ts_df)
+# check time series of smoke in each county
+ggplot(wash_jul_oct_ts_df, aes(x = date, y = geo_smk_pm_unit10)) +
+  geom_point() +
+  facet_wrap(~county)
+
 ```
 
 ```{r basic time series}
@@ -128,5 +132,80 @@ main="Cumulative association with a 1-unit increase in PM2.5")
 
 
 ```
+
+May not be appropriate to aggregate for the entrie state. Try a county that had some high smoke vals.
+
+```{r chelan dlm}
+# make df
+chelan_df <- wash_jul_oct_ts_df %>% 
+  filter(county == "Chelan")
+
+summary(chelan_df)
+
+# plot relationship
+ggplot(chelan_df, aes(x = date, y = resp_n_wo_miss)) +
+  geom_point()
+
+
+# sparse counts of asthma visits. i'll try dlm resp and cvd
+cb1.pm <- crossbasis(chelan_df$geo_smk_pm_unit10, lag = 15, 
+                     argvar=list(fun="lin"), arglag=list(fun="poly", degree=5))
+
+# wrf temp
+cb1.temp <- crossbasis(chelan_df$wrf_temp, lag = 3, 
+                     argvar=list(df=5), arglag=list(fun="strata", breaks=1))
+
+summary(cb1.pm)
+summary(cb1.temp)
+
+# standard model
+summary(glm(cvd_n_wo_miss ~ geo_smk_pm_unit10 + wrf_temp, 
+            family = quasipoisson(), chelan_df))
+
+# distributed lag model
+model1 <- glm(cvd_n_wo_miss ~ cb1.pm + cb1.temp, family=quasipoisson(), chelan_df)
+
+summary(model1)
+
+
+pred1.pm <- crosspred(cb1.pm, model1, at=0:20, bylag=0.2, cumul=TRUE)
+
+plot(pred1.pm, "slices", var=10, col=3, ylab="RR", ci.arg=list(density=15,lwd=2),
+main="Association with a 10-unit increase in PM2.5")
+
+
+plot(pred1.pm, "slices", var=10, col=2, cumul=TRUE, ylab="Cumulative RR",
+main="Cumulative association with a 10-unit increase in PM2.5")
+
+# random effects model for the whole state
+# sparse counts of asthma visits. i'll try dlm resp and cvd
+cb1.pm <- crossbasis(wash_jul_oct_ts_df$geo_smk_pm_unit10, lag = 15, 
+                     argvar=list(fun="lin"), arglag=list(fun="poly", degree=5))
+
+# wrf temp
+cb1.temp <- crossbasis(wash_jul_oct_ts_df$wrf_temp, lag = 3, 
+                     argvar=list(df=5), arglag=list(fun="strata", breaks=1))
+
+summary(cb1.pm)
+summary(cb1.temp)
+
+# distributed lag model
+model1 <- glm(asthma_n_wo_miss ~ cb1.pm + cb1.temp + county, family=quasipoisson(), 
+              wash_jul_oct_ts_df)
+
+summary(model1)
+
+# plots
+pred1.pm <- crosspred(cb1.pm, model1, at=0:20, bylag=0.2, cumul=TRUE)
+
+plot(pred1.pm, "slices", var=10, col=3, ylab="RR", ci.arg=list(density=15,lwd=2),
+main="Association with a 10-unit increase in PM2.5")
+
+
+plot(pred1.pm, "slices", var=10, col=2, cumul=TRUE, ylab="Cumulative RR",
+main="Cumulative association with a 10-unit increase in PM2.5")
+
+```
+
 
 
