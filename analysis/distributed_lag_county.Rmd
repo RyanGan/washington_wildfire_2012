@@ -83,14 +83,19 @@ ggplot(wa_state_aggregate, aes(x = date, y = n)) +
   geom_point() +
   facet_wrap(~outcome, scales = "free")
   
+# check asthma count as a function of pm2.5
+ggplot(wash_jul_oct_ts_df, aes(x = geo_smk_pm_unit10, y = resp_n_wo_miss)) +
+  geom_point() +
+  facet_wrap(~county)
 
+glimpse(wash_jul_oct_ts_df)
 ```
 
 ```{r basic time series}
 
 # using asthma as an example
-mixed_mod <- tidy(glmer(asthma_n ~ geo_smk_pm + (1|county), 
-                        wash_ts_df, family = "poisson"))
+mixed_mod <- tidy(glmer(asthma_n_wo_miss ~ geo_smk_pm_unit10 + wrf_temp + (1|county), 
+                        wash_jul_oct_ts_df, family = "poisson"))
 
 mixed_mod
 
