@@ -1,7 +1,7 @@
 ---
 title: "Washington: County-Level Wildfire Smoke and Health Outcomes for Manuscript"
 author: "Ryan Gan"
-date: "March 1, 2017"
+date: "March 3rd, 2017"
 output: html_document
 ---
 
@@ -31,78 +31,63 @@ Rish wanted a couple key things
 
 ```{r data import, include = F, echo = FALSE}
 # Set working directory and read in files --------------------------------------
-# direct path for mac
-path <- paste0("./analysis/analysis_data")
-
-# direct path for pc
-#path <- paste0("C:/Users/RGan/Documents/git_local_repos/wildfire/",
-#               "wildfire_washington/analysis/analysis_data")
+setwd("C:/Users/RGan/Documents/git_local_repos/washington_wildfire_2012")
+# relative path
+health_path <- paste0("./data/health_data")
 
 # Infile case-crossover dataframes ---------------------------------------------
 # Dataframes made in 'chars_3month_binary_smoke_may2016 script
 # resp exacerbations
-resp_casecross <- read_csv(paste(path, 
-                                 "resp1_jul_to_oct_time_strat_casecross.csv", 
-                                 sep = "/"))
+resp_casecross <- read_csv(paste(health_path, 
+  "resp1_jul_to_oct_time_strat_casecross.csv", sep = "/"))
 # asthma
-asthma_casecross <- read_csv(paste(path, 
-                                   "asthma1_jul_to_oct_time_strat_casecross.csv", 
-                                   sep = "/"))
+asthma_casecross <- read_csv(paste(health_path, 
+  "asthma1_jul_to_oct_time_strat_casecross.csv", sep = "/"))
 # copd 
-copd_casecross <- read_csv(paste(path, 
-                                 "copd1_jul_to_oct_time_strat_casecross.csv", 
-                                 sep = "/"))
+copd_casecross <- read_csv(paste(health_path, 
+  "copd1_jul_to_oct_time_strat_casecross.csv", sep = "/"))
 # copd exacerbations
-copd_ex_casecross <- read_csv(paste(path, 
-                                    "copd_ex1_jul_to_oct_time_strat_casecross.csv",
-                                    sep="/"))
+copd_ex_casecross <- read_csv(paste(health_path, 
+  "copd_ex1_jul_to_oct_time_strat_casecross.csv", sep="/"))
 # pneum or bronchitis
-pneum_casecross <- read_csv(paste(path, 
-                                  "pneum1_jul_to_oct_time_strat_casecross.csv",
-                                  sep="/"))
+pneum_casecross <- read_csv(paste(health_path, 
+  "pneum1_jul_to_oct_time_strat_casecross.csv", sep="/"))
 # acute bronchitis
-acute_bronch_casecross <- read_csv(paste(path, 
-                                   "acute_bronch1_jul_to_oct_time_strat_casecross.csv",
-                                         sep = "/"))
+acute_bronch_casecross <- read_csv(paste(health_path, 
+  "acute_bronch1_jul_to_oct_time_strat_casecross.csv", sep = "/"))
 # cvd
-cvd_casecross <- read_csv(paste(path, 
-                                "cvd1_jul_to_oct_time_strat_casecross.csv",
-                                sep="/"))
+cvd_casecross <- read_csv(paste(health_path, 
+  "cvd1_jul_to_oct_time_strat_casecross.csv", sep="/"))
 # arrhythmia
-arrhythmia_casecross <- read_csv(paste(path, 
-                                "arrhythmia1_jul_to_oct_time_strat_casecross.csv",
-                                 sep="/"))
+arrhythmia_casecross <- read_csv(paste(health_path, 
+  "arrhythmia1_jul_to_oct_time_strat_casecross.csv", sep="/"))
 # cerebral vascular
-cereb_vas_casecross <- read_csv(paste(path, 
-                                "cereb_vas1_jul_to_oct_time_strat_casecross.csv",
-                                sep="/"))
+cereb_vas_casecross <- read_csv(paste(health_path, 
+  "cereb_vas1_jul_to_oct_time_strat_casecross.csv",sep="/"))
 # heart failure
-hf_casecross <- read_csv(paste(path, 
-                               "hf1_jul_to_oct_time_strat_casecross.csv", 
-                               sep="/"))
+hf_casecross <- read_csv(paste(health_path, 
+  "hf1_jul_to_oct_time_strat_casecross.csv", sep="/"))
 # ischemic heart disease
-ihd_casecross <- read_csv(paste(path, 
-                                "ihd1_jul_to_oct_time_strat_casecross.csv",
-                                sep="/"))
+ihd_casecross <- read_csv(paste(health_path, 
+  "ihd1_jul_to_oct_time_strat_casecross.csv", sep="/"))
 # myo infarc
-mi_casecross <- read_csv(paste(path, 
-                               "mi1_jul_to_oct_time_strat_casecross.csv", sep="/"))
+mi_casecross <- read_csv(paste(health_path, 
+  "mi1_jul_to_oct_time_strat_casecross.csv", sep="/"))
 # RA
-ra_casecross <- read_csv(paste(path, 
-                               "ra1_jul_to_oct_time_strat_casecross.csv", sep="/"))
+ra_casecross <- read_csv(paste(health_path, 
+  "ra1_jul_to_oct_time_strat_casecross.csv", sep="/"))
 # broken arm
-broken_arm_casecross <- read_csv(paste(path, 
-                                       "broken_arm1_jul_to_oct_time_strat_casecross.csv",
-                                       sep="/"))
+broken_arm_casecross <- read_csv(paste(health_path, 
+  "broken_arm1_jul_to_oct_time_strat_casecross.csv", sep="/"))
 
 # read county smoke pm for figures with FIPS codes
-county_pm <- read_csv("./smoke/pm_data/wa_county_pop_wt_pm.csv") 
+county_pm <- read_csv("./data/pm_data/wa_county_pop_wt_pm.csv") 
 
 # read locations of fires
-fire_loc <- read_csv("./analysis/analysis_data/washington_fires_locations201209.csv")
+fire_loc <- read_csv("./data/pm_data/washington_fires_locations201209.csv")
 
 # import the county-level met data files Rish sent
-county_met <- read_csv("./analysis/analysis_data/wa_cty_exp_0710_2012_ryan.csv") %>% 
+county_met <- read_csv("./data/pm_data/wa_cty_exp_0710_2012_ryan.csv") %>% 
   # define date variable; original character looked like: 01JUL2012
   mutate(date = as.Date(date, "%d%B%Y"))
 
@@ -931,7 +916,6 @@ combined_point_est_df$p_val <- as.numeric(combined_point_est_df$p_val)
     strip.text = element_text(size = 7),
     legend.text = element_text(size = 7),
     # axis element
-    axis.title.y = element_text(angle = 90),
     axis.text.x = element_blank(),
     axis.title.y = element_text(angle = 90))
 
@@ -1155,7 +1139,6 @@ geo_smk_lag_plot$upper95 <- as.numeric(geo_smk_lag_plot$upper95)
     strip.text = element_text(size = 7),
     legend.text = element_text(size = 7),
     # axis element
-    axis.title.y = element_text(angle = 90),
     #axis.text.x = element_blank(),
     axis.title.y = element_text(angle = 90))
 
@@ -1174,8 +1157,10 @@ The results can be interpreted as you would a risk ratio or odds ratio from the 
 
 ```{r time series rando effect, echo = F, warning= F, message=F, results='asis'} 
 
+setwd("C:/Users/RGan/Documents/git_local_repos/washington_wildfire_2012")
+
 # load time series dataframe
-wash_ts_df <- read_csv(paste(path, "wa_2012_county_time_series.csv", sep="/"))
+wash_ts_df <- read_csv(paste(health_path, "wa_2012_county_time_series.csv", sep="/"))
 
 # analysis dataframe
 wash_jul_oct_df <- wash_ts_df %>% 
