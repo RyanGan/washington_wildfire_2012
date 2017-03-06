@@ -1,0 +1,211 @@
+---
+title: "Distributed Lag Model"
+author: "Ryan_Gan"
+date: "January 24, 2017"
+output: html_document
+---
+
+
+## Purpose of Markdown File
+
+Trying out distributed lag models using the 'dlnm' package. Loading libraries.
+
+```{r libraries used}
+
+library(tidyverse) # data wrangle package
+library(dlnm) # distributed lag models
+library(lme4) # random-effects model
+library(broom) # broom for tidy data from stats models
+library(splines) # spline library
+
+```
+
+Importing county-level time-series data.
+
+```{r county time series import}
+# file path
+file_path <- paste0("./analysis/analysis_data/wa_2012_county_time_series.csv")
+
+# read file
+wash_ts_df <- read_csv(file_path)
+
+summary(wash_ts_df)
+
+# analysis dataframe
+wash_jul_oct_ts_df <- wash_ts_df %>% 
+  # restricting points
+  filter(date >= "2012-07-01" & date <= "2012-10-31") %>% 
+  # exclude 'Unknown' and 'not_wa_residence'
+  filter(county != "not_wa_residence" & county != "Unknown") %>% 
+  # create day of the week variable
+  mutate(day = as.factor(weekdays(date))) %>% 
+  # set missing outcome values to 0 since missing indicates no ER or urgent care 
+  # visits on that date (which is reasonable in sparsely populated counties)
+  mutate_each(funs(wo_miss = ifelse(is.na(.), 0, .)), n_obs:ra_n) %>% 
+  # create a binary smoke indicator variable based smk variables >5, >10, and >15 units 
+  mutate(wrf_smk5 = ifelse(wrf_smk_pm >= 5, 1, 0), 
+         wrf_smk10 = ifelse(wrf_smk_pm >= 10, 1, 0),
+         wrf_smk15 = ifelse(wrf_smk_pm >= 15, 1, 0), 
+         geo_smk5 = ifelse(geo_smk_pm >= 5, 1, 0),
+         geo_smk10 = ifelse(geo_smk_pm >= 10, 1, 0),
+         geo_smk15 = ifelse(geo_smk_pm >= 15, 1, 0),
+         krig_smk5 = ifelse(krig_smk_pm >= 5, 1, 0),
+         krig_smk10 = ifelse(krig_smk_pm >= 10, 1, 0),
+         krig_smk15 = ifelse(krig_smk_pm >= 15, 1, 0), 
+         season = ifelse(date >= "2012-06-22" &  date <= "2012-09-22", "summer",
+                  ifelse(date >= "2012-09-23" & date <= "2012-12-21", "fall",
+                          "other"))) %>% 
+  # rescale pm variables to 10 units
+  mutate_each(funs(unit10 = ./10), wrf_pm:krig_smk_pm) %>% 
+  select(1:2, 31:33, 36, 34:35, 38:44, 28:29, 30, 55, 58, 
+         65, 64, 63) # subset and order variables used in analysis
+
+
+```
+
+
+## Visualizing Time-Series data
+
+```{r plot of events over time}
+
+# wrangle time-series dataframe to create small multiples of health outcomes
+outcome_plot_df <- wash_ts_df %>% filter(county != "Unknown") %>% # remove unknown county
+  select(1:8, 10:16) # select columns of health outcomes
+
+wa_state_aggregate <- outcome_plot_df %>% select(-county) %>% 
+  group_by(date) %>% 
+  summarise_each(funs(sum(., na.rm = T))) %>% 
+  gather(key = outcome, value = n, -date)
+
+summary(wa_state_aggregate)
+
+ggplot(wa_state_aggregate, aes(x = date, y = n)) +
+  geom_point() +
+  facet_wrap(~outcome, scales = "free")
+  
+# check asthma count as a function of pm2.5
+ggplot(wash_jul_oct_ts_df, aes(x = geo_smk_pm_unit10, y = resp_n_wo_miss)) +
+  geom_point() +
+  facet_wrap(~county)
+
+# check time series of smoke in each county
+ggplot(wash_jul_oct_ts_df, aes(x = date, y = geo_smk_pm_unit10)) +
+  geom_point() +
+  facet_wrap(~county)
+
+```
+
+```{r basic time series}
+
+# using asthma as an example
+mixed_mod <- tidy(glmer(asthma_n_wo_miss ~ geo_smk_pm_unit10 + wrf_temp + (1|county), 
+                        wash_jul_oct_ts_df, family = "poisson"))
+
+mixed_mod
+
+```
+
+General interpretation would be for a 1 ug/m^3 increase in smoke PM2.5, astham events increase by 1%.
+
+```{r simple dlm}
+
+cb1.pm <- crossbasis(wash_ts_df$geo_wt_pm, lag = 15, argvars=list(fun="lin"),
+                     arglag=list(fun="poly", degree=5))
+
+summary(cb1.pm)
+
+model1 <- glm(asthma_n ~ cb1.pm ,
+              family=quasipoisson(), wash_ts_df)
+
+summary(model1)
+
+
+pred1.pm <- crosspred(cb1.pm, model1, at=0:20, bylag=0.2, cumul=TRUE)
+
+plot(pred1.pm, "slices", var=10, col=3, ylab="RR", ci.arg=list(density=15,lwd=2),
+main="Association with a 1-unit increase in PM2.5")
+
+
+plot(pred1.pm, "slices", var=10, col=2, cumul=TRUE, ylab="Cumulative RR",
+main="Cumulative association with a 1-unit increase in PM2.5")
+
+
+
+```
+
+May not be appropriate to aggregate for the entrie state. Try a county that had some high smoke vals.
+
+```{r chelan dlm}
+# make df
+chelan_df <- wash_jul_oct_ts_df %>% 
+  filter(county == "Chelan")
+
+summary(chelan_df)
+
+# plot relationship
+ggplot(chelan_df, aes(x = date, y = resp_n_wo_miss)) +
+  geom_point()
+
+
+# sparse counts of asthma visits. i'll try dlm resp and cvd
+cb1.pm <- crossbasis(chelan_df$geo_smk_pm_unit10, lag = 15, 
+                     argvar=list(fun="lin"), arglag=list(fun="poly", degree=5))
+
+# wrf temp
+cb1.temp <- crossbasis(chelan_df$wrf_temp, lag = 3, 
+                     argvar=list(df=5), arglag=list(fun="strata", breaks=1))
+
+summary(cb1.pm)
+summary(cb1.temp)
+
+# standard model
+summary(glm(cvd_n_wo_miss ~ geo_smk_pm_unit10 + wrf_temp, 
+            family = quasipoisson(), chelan_df))
+
+# distributed lag model
+model1 <- glm(cvd_n_wo_miss ~ cb1.pm + cb1.temp, family=quasipoisson(), chelan_df)
+
+summary(model1)
+
+
+pred1.pm <- crosspred(cb1.pm, model1, at=0:20, bylag=0.2, cumul=TRUE)
+
+plot(pred1.pm, "slices", var=10, col=3, ylab="RR", ci.arg=list(density=15,lwd=2),
+main="Association with a 10-unit increase in PM2.5")
+
+
+plot(pred1.pm, "slices", var=10, col=2, cumul=TRUE, ylab="Cumulative RR",
+main="Cumulative association with a 10-unit increase in PM2.5")
+
+# random effects model for the whole state
+# sparse counts of asthma visits. i'll try dlm resp and cvd
+cb1.pm <- crossbasis(wash_jul_oct_ts_df$geo_smk_pm_unit10, lag = 15, 
+                     argvar=list(fun="lin"), arglag=list(fun="poly", degree=5))
+
+# wrf temp
+cb1.temp <- crossbasis(wash_jul_oct_ts_df$wrf_temp, lag = 3, 
+                     argvar=list(df=5), arglag=list(fun="strata", breaks=1))
+
+summary(cb1.pm)
+summary(cb1.temp)
+
+# distributed lag model
+model1 <- glm(asthma_n_wo_miss ~ cb1.pm + cb1.temp + county, family=quasipoisson(), 
+              wash_jul_oct_ts_df)
+
+summary(model1)
+
+# plots
+pred1.pm <- crosspred(cb1.pm, model1, at=0:20, bylag=0.2, cumul=TRUE)
+
+plot(pred1.pm, "slices", var=10, col=3, ylab="RR", ci.arg=list(density=15,lwd=2),
+main="Association with a 10-unit increase in PM2.5")
+
+
+plot(pred1.pm, "slices", var=10, col=2, cumul=TRUE, ylab="Cumulative RR",
+main="Cumulative association with a 10-unit increase in PM2.5")
+
+```
+
+
+
