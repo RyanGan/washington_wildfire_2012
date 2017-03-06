@@ -96,13 +96,13 @@ broken_arm_casecross <- read_csv(paste(path,
                                        sep="/"))
 
 # read county smoke pm for figures with FIPS codes
-county_pm <- read_csv("./smoke/pm_data/wa_county_fips_pop_wt_pm.csv") 
+county_pm <- read_csv("./smoke/pm_data/wa_county_pop_wt_pm.csv") 
 
 # read locations of fires
-fire_loc <- read_csv("./smoke/pm_data/washington_fires201209.csv")
+fire_loc <- read_csv("./analysis/analysis_data/washington_fires_locations201209.csv")
 
 # import the county-level met data files Rish sent
-county_met <- read_csv("./analysis_data/wa_cty_exp_0710_2012_ryan.csv") %>% 
+county_met <- read_csv("./analysis/analysis_data/wa_cty_exp_0710_2012_ryan.csv") %>% 
   # define date variable; original character looked like: 01JUL2012
   mutate(date = as.Date(date, "%d%B%Y"))
 
