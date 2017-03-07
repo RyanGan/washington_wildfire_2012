@@ -342,7 +342,7 @@ The following table is similar to the previous time-stratified case-crossover wi
 
 ```{r time stratified design county, warning = F, echo = F, results='asis'} 
 # note above, results = 'asis' needed to print htmlTables
-summary(df_to_loop)
+
 # I removed copd exacerbation and rheuamtoid arthritis
 
 # dataframe list
@@ -374,9 +374,7 @@ for(i in 1:length(df_list)){
   outcome_name <- outcome_list[i]
 
   # extract covariates from dataframe
-  covariates_df <- df_to_loop[, c(1:16, 94:95, 151:157)] %>% 
-  # bind with CDC county-level met variables provided by rish
-    left_join(county_met2, by = c("county", "date"))
+  covariates_df <- df_to_loop[, c(1:16, 94:95, 151:157)] 
   
   # modified to select county estimates
   # extract pm values and divide by 10 and ordered by how I want to present in paper
@@ -409,19 +407,18 @@ for(i in 1:length(df_list)){
 
 
   # second loop to run a model for each pm estimation method
-    for(j in 55:58){
+    for(j in 26:29){
 
       # variable to model 
       var_name <- colnames(df_analysis[j])
 
       # conditional logistic regression model
-      mod <- clogit(outcome ~ df_analysis[[j]] + daily_meanRH + daily_meanT +
-                    daily_meanWS + daily_meanPrcp + 
+      mod <- clogit(outcome ~ df_analysis[[j]] + wrf_temp_county +
                     strata(PATIENTID), df_analysis)
       
 
       # populate matrix
-      row_n <- j-54
+      row_n <- j-25
       
       point_estimates[row_n, 2] <- method_list[row_n]
       point_estimates[row_n, 3] <- mod$n
@@ -544,8 +541,28 @@ daily_county_met <- county_met %>%
   # limit to new met variables (getting rid of smoke variables I already have)
   select(1:17) %>% 
   mutate(FIPS5 = as.character(FIPS5)) %>% 
-  right_join(county_fips_key, by = "FIPS5")
+  right_join(county_fips_key, by = "FIPS5") %>% 
+  arrange(county, date) %>% 
+  # create lag vars for each county
+  group_by(county) %>% 
+  mutate(cdc_temp_lag1 = lag(daily_meanT, 1, order_by = county),
+         cdc_temp_lag2 = lag(daily_meanT, 2, order_by = county),
+         cdc_temp_lag3 = lag(daily_meanT, 3, order_by = county),
+         cdc_rh_lag1 = lag(daily_meanRH, 1, order_by = county),
+         cdc_rh_lag2 = lag(daily_meanRH, 2, order_by = county),
+         cdc_rh_lag3 = lag(daily_meanRH, 3, order_by = county),
+         cdc_ws_lag1 = lag(daily_meanWS, 1, order_by = county),
+         cdc_ws_lag2 = lag(daily_meanWS, 2, order_by = county),
+         cdc_ws_lag3 = lag(daily_meanWS, 3, order_by = county),
+         cdc_prcp_lag1 = lag(daily_meanPrcp, 1, order_by = county),
+         cdc_prcp_lag2 = lag(daily_meanPrcp, 2, order_by = county),
+         cdc_prcp_lag3 = lag(daily_meanPrcp, 3, order_by = county)) 
 
+
+daily_meanRH + daily_meanT + daily_meanWS + 
+                      daily_meanPrcp
+head(daily_county_met)
+  
 ```
 
 
@@ -722,7 +739,7 @@ combined_point_est_df$p_val <- as.numeric(combined_point_est_df$p_val)
     geom_errorbar(aes(ymin=lower95, ymax=upper95), width = 0.2) +
     facet_wrap(~outcome, nrow = 3) +
     geom_hline(yintercept = 1, linetype=2) +
-    ggtitle('County-Level: Association Between PM2.5 \n from Wildfire Smoke on Hospitalizations') +
+    ggtitle('County-Level: Association Between PM2.5 from Wildfire Smoke on Hospitalizations') +
     ylab('Odds Ratio for 10µg/m^3 Increase in PM2.5') +
     xlab('Time-Stratified Within July to October Fire Season') +
     # plot theme
@@ -771,7 +788,7 @@ datalist <- list()
 # data wrangling ----
 # Producing conditional logit model estimates loop 
 for(i in 1:length(df_list)){
-
+i <- 2
 # dataframe to loop through
   df_to_loop <- data.frame(df_list[i])
   # indication of column
@@ -788,7 +805,7 @@ for(i in 1:length(df_list)){
   # create moving average here
   pm_estimates_df <- df_to_loop[, c(86, 106:110, 93, 141:145,
                                     92, 136:140, 91, 131:135)]/10  # create 10 unit increases
-  
+
   
   # dataframe for analysis creation
   # bind columns back together 
@@ -797,6 +814,9 @@ for(i in 1:length(df_list)){
     filter(!is.na(wrf_smk_pm_county)) %>% 
     # limit to emergency or urgent care
     filter(ADM_TYPE == 1 | ADM_TYPE == 2) %>%
+    # join in cdc met data
+    full_join(daily_county_met, by = c("county", "date")) %>% 
+    # dataframe is already for the entire fire season, so I don't need to subset anymore
     # the following code makes sure that the counterfactual values retained are 
     # symetric in that number of obs before = number of obs after
     mutate(obs_diff_admission = (date - date_admit)/7,
@@ -805,9 +825,10 @@ for(i in 1:length(df_list)){
            krig_smk_avg = (krig_smk_pm_county + krig_smk_pm_lag1_county + krig_smk_pm_lag2_county)/3,
            global_smk_avg = (global_smk_pm_county + global_smk_pm_lag1_county + global_smk_pm_lag2_county)/3,
            geo_smk_avg = (geo_smk_pm_county + geo_smk_pm_lag1_county + geo_smk_pm_lag2_county)/3,
-           temp_avg = (wrf_temp_county + wrf_temp_lag1_county + wrf_temp_lag2_county)/3)
+           temp_avg = (wrf_temp_county + wrf_temp_lag1_county + wrf_temp_lag2_county)/3,
+           )
     # dataframe is already for the entire fire season, so I don't need to subset anymore
-  
+  summary(df_analysis)
   # empty df for table
   table_df <- data.frame()
   
@@ -912,7 +933,8 @@ combined_point_est_df$p_val <- as.numeric(combined_point_est_df$p_val)
     geom_errorbar(aes(ymin=lower95, ymax=upper95), width = 0.2) +
     facet_wrap(~outcome, nrow = 3) +
     geom_hline(yintercept = 1, linetype=2) +
-    ggtitle('County-Level: Association Between PM2.5 \n from Wildfire Smoke on Hospitalizations') +
+    ggtitle(paste0("County-Level: Association Between PM2.5 from Wildfire",
+                   " Smoke on Hospitalizations (0-2 day)")) +
     ylab('Odds Ratio for 0-2 Lag Day Average 10µg/m^3 Increase in PM2.5') +
     xlab('Time-Stratified Within July to October Fire Season') +
     scale_colour_discrete(name= "Smoke Method") +
