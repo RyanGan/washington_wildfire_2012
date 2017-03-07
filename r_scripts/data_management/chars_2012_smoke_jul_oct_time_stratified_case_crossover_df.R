@@ -16,19 +16,24 @@
 
 # Libraries ----
 # load libraries
-library(tidyverse)
+#library(tidyverse) # tidyverse not on the server
+# if tidyverse is not available, use dplyr and readr
+library(dplyr) 
+library(readr)
 library(lubridate) # working with date
-
+# parallel computing libraries
+library(foreach) 
+library(doParallel)
 
 # Read in smoke data created in loop -------------------------------------------
-getwd()
+
 # read in zipcode level populatoin-weighted pm
-read_path <- paste0('./data/pm_data/zip_pm_to_merge_with_chars.csv')
+read_path <- paste0('../../data/pm_data/zip_pm_to_merge_with_chars.csv')
 
 zip_smoke <- read_csv(read_path) 
 
 # read in county level population-weighted pm
-read_path2 <- paste0('./data/pm_data/wa_county_pop_wt_pm.csv')
+read_path2 <- paste0('../../data/pm_data/wa_county_pop_wt_pm.csv')
 
 county_smoke <- read_csv(read_path2)
 # descriptives of the two smoke datasets
@@ -202,19 +207,18 @@ county_smoke_w_lag <- county_smoke %>% arrange(county, date) %>%
 
 # Infile the Permanent Cleaned CHARS 2012 DataFrame ----------------------------
 # Put this file on the atmos server ASAP
-read <- paste0('C:/Users/RGan/Documents/CSU/Wild Fire/Washington St CHARS Data/',
-               'confidential_data/chars_2012_confidential.csv')
+read_chars <- paste0('../../data/health_data/chars_2012_confidential.csv')
 # read in chars cleaned data
-chars_2012_conf_df <- read_csv(read)
+chars_2012_conf_df <- read_csv(read_chars)
 # check data
 glimpse(chars_2012_conf_df)
 
 # find how many admissions overall were during the july 1 to oct31 timeframe
-n_period <- chars_2012_conf_df %>% 
-  filter(ADM_DATE >= "2012-07-01" & ADM_DATE <= "2012-10-31") %>% 
-  nrow()
+#n_period <- chars_2012_conf_df %>% 
+#  filter(ADM_DATE >= "2012-07-01" & ADM_DATE <= "2012-10-31") %>% 
+#  nrow()
 
-n_period
+#n_period
 
 
 # look up admit type, may want to subset to specifc admit
@@ -259,17 +263,17 @@ chars_2012_to_loop <- chars_2012_conf_df %>%
 
 summary(chars_2012_to_loop)
 
+
+# Setup for parallel computing before for loop ---------------------------------
+cores <- detectCores()
+cl <- makeCluster(cores/2) # use half the cores on the vet cluster
+registerDoParallel(cl)
+
 # Case-crossover datasets ------------------------------------------------------
-
-
-# set path to write permanent files
-wd_path <- paste0('./analysis/analysis_data')
-setwd(wd_path)
-# check working directory
-getwd()
 
 glimpse(chars_2012_to_loop)
 
+# set variable list
 var_list <- c('resp1', 'asthma1', 'copd_ex1', 'copd1', 'pneum1', 'acute_bronch1',
               'cvd1', 'mi1', 'arrhythmia1', 'cereb_vas1', 'ihd1', 'hf1', 'ra1',
               'broken_arm1')
@@ -278,7 +282,7 @@ var_list <- c('resp1', 'asthma1', 'copd_ex1', 'copd1', 'pneum1', 'acute_bronch1'
 # still to large to efficiently make datasets on this keyboard. Need to refine.
 
 start <- Sys.time()
-for(j in var_list){ # begin first loop of variable names (outcomes)
+foreach(j=1:length(var_list)) %dopar% { # begin first loop of variable names (outcomes)
 
 # Case-Crossover loop ----------------------------------------------------------
 
@@ -323,7 +327,7 @@ outcome_col2 <- which(colnames(single_visits) == j) # use to keep outcome var
 id_date_df <- data_frame()
 
 # begin second loop to create counterfactual observations for each case subject
-        for (i in 1:nrow(single_visits)){
+        foreach(i=1:nrow(single_visits)) %dopar% {
          # code dates for each id up to two months before and after the event (56 days)
          # note 10/10/16, trying the entire referent periods of 126
          date <- seq(as.Date(single_visits[[i, 12]] - 126), 
@@ -375,16 +379,19 @@ outcome_casecross <- id_date_df %>%
 #which(colnames(outcome_casecross)=='geo_wt_pm_county')
 #check <- outcome_casecross[, c(1:16, 20, 87, 151:157)]
 
-# Create a permanent case-cross over dataset
-file_name <- paste(j, 'jul_to_oct_time_strat_casecross.csv', sep = '_')
+# Create a permanent case-cross over datasets
+file_name <- paste0('./data/health_data/', j, 
+		    '_jul_to_oct_time_strat_casecross.csv')
 
 # write permanent dataset
 write_csv(outcome_casecross, file_name)
 
       } # End of the overall loop
 
-# sweet this works
+# stop cluster
+stopCluster(cl)
 
+# record total time
 total_time <- Sys.time() - start
 total_time
 
