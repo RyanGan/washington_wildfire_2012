@@ -380,7 +380,7 @@ outcome_casecross <- id_date_df %>%
 #check <- outcome_casecross[, c(1:16, 20, 87, 151:157)]
 
 # Create a permanent case-cross over datasets
-file_name <- paste0('./data/health_data/', j, 
+file_name <- paste0('../../data/health_data/', j, 
 		    '_jul_to_oct_time_strat_casecross.csv')
 
 # write permanent dataset
