@@ -3,10 +3,6 @@
 .RData
 .Ruserdata
 
-data/
-
-analysis_data/
-
 *.pdf
 
 *.Rproj
