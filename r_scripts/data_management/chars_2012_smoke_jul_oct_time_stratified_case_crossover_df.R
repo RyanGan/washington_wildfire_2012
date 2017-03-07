@@ -23,12 +23,12 @@ library(lubridate) # working with date
 # Read in smoke data created in loop -------------------------------------------
 getwd()
 # read in zipcode level populatoin-weighted pm
-read_path <- paste0('./smoke/pm_data/zip_pm_to_merge_with_chars.csv')
+read_path <- paste0('./data/pm_data/zip_pm_to_merge_with_chars.csv')
 
 zip_smoke <- read_csv(read_path) 
 
 # read in county level population-weighted pm
-read_path2 <- paste0('./smoke/pm_data/wa_county_pop_wt_pm.csv')
+read_path2 <- paste0('./data/pm_data/wa_county_pop_wt_pm.csv')
 
 county_smoke <- read_csv(read_path2)
 # descriptives of the two smoke datasets
@@ -38,156 +38,167 @@ summary(zip_smoke)
 # Zipcode PM2.5 estimates
 # create lag variables that take smoke values from n previous days for zipcodes
 zip_smoke_w_lag <- zip_smoke %>% arrange(ZIPCODE, date) %>%
+  # group by zipcode
+  group_by(ZIPCODE) %>% 
   # wrf
-  mutate(wrf_pm_lag1 = lag(wrf_pm, 1), 
-    wrf_pm_lag2 = lag(wrf_pm, 2),
-    wrf_pm_lag3 = lag(wrf_pm, 3),
-    wrf_pm_lag4 = lag(wrf_pm, 4),
-    wrf_pm_lag5 = lag(wrf_pm, 5),
+  mutate(wrf_pm_lag1 = lag(wrf_pm, 1, order_by = ZIPCODE), 
+    wrf_pm_lag2 = lag(wrf_pm, 2, order_by = ZIPCODE),
+    wrf_pm_lag3 = lag(wrf_pm, 3, order_by = ZIPCODE),
+    wrf_pm_lag4 = lag(wrf_pm, 4, order_by = ZIPCODE),
+    wrf_pm_lag5 = lag(wrf_pm, 5, order_by = ZIPCODE),
     # wrf no fire lag
-    wrf_nf_pm_lag1 = lag(wrf_nf_pm, 1),
-    wrf_nf_pm_lag2 = lag(wrf_nf_pm, 2),
-    wrf_nf_pm_lag3 = lag(wrf_nf_pm, 3),
-    wrf_nf_pm_lag4 = lag(wrf_nf_pm, 4),
-    wrf_nf_pm_lag5 = lag(wrf_nf_pm, 5),
+    wrf_nf_pm_lag1 = lag(wrf_nf_pm, 1, order_by = ZIPCODE),
+    wrf_nf_pm_lag2 = lag(wrf_nf_pm, 2, order_by = ZIPCODE),
+    wrf_nf_pm_lag3 = lag(wrf_nf_pm, 3, order_by = ZIPCODE),
+    wrf_nf_pm_lag4 = lag(wrf_nf_pm, 4, order_by = ZIPCODE),
+    wrf_nf_pm_lag5 = lag(wrf_nf_pm, 5, order_by = ZIPCODE),
     # wrf_smk_pm
-    wrf_smk_pm_lag1 = lag(wrf_smk_pm, 1),
-    wrf_smk_pm_lag2 = lag(wrf_smk_pm, 2),
-    wrf_smk_pm_lag3 = lag(wrf_smk_pm, 3),
-    wrf_smk_pm_lag4 = lag(wrf_smk_pm, 4),
-    wrf_smk_pm_lag5 = lag(wrf_smk_pm, 5),
+    wrf_smk_pm_lag1 = lag(wrf_smk_pm, 1, order_by = ZIPCODE),
+    wrf_smk_pm_lag2 = lag(wrf_smk_pm, 2, order_by = ZIPCODE),
+    wrf_smk_pm_lag3 = lag(wrf_smk_pm, 3, order_by = ZIPCODE),
+    wrf_smk_pm_lag4 = lag(wrf_smk_pm, 4, order_by = ZIPCODE),
+    wrf_smk_pm_lag5 = lag(wrf_smk_pm, 5, order_by = ZIPCODE),
     # geo weighted pm
-    geo_wt_pm_lag1 = lag(geo_wt_pm, 1),
-    geo_wt_pm_lag2 = lag(geo_wt_pm, 2),
-    geo_wt_pm_lag3 = lag(geo_wt_pm, 3),
-    geo_wt_pm_lag4 = lag(geo_wt_pm, 4),
-    geo_wt_pm_lag5 = lag(geo_wt_pm, 5),
+    geo_wt_pm_lag1 = lag(geo_wt_pm, 1, order_by = ZIPCODE),
+    geo_wt_pm_lag2 = lag(geo_wt_pm, 2, order_by = ZIPCODE),
+    geo_wt_pm_lag3 = lag(geo_wt_pm, 3, order_by = ZIPCODE),
+    geo_wt_pm_lag4 = lag(geo_wt_pm, 4, order_by = ZIPCODE),
+    geo_wt_pm_lag5 = lag(geo_wt_pm, 5, order_by = ZIPCODE),
     # global reg pm
-    global_reg_pm_lag1 = lag(global_reg_pm, 1),
-    global_reg_pm_lag2 = lag(global_reg_pm, 2),
-    global_reg_pm_lag3 = lag(global_reg_pm, 3),
-    global_reg_pm_lag4 = lag(global_reg_pm, 4),
-    global_reg_pm_lag5 = lag(global_reg_pm, 5),
+    global_reg_pm_lag1 = lag(global_reg_pm, 1, order_by = ZIPCODE),
+    global_reg_pm_lag2 = lag(global_reg_pm, 2, order_by = ZIPCODE),
+    global_reg_pm_lag3 = lag(global_reg_pm, 3, order_by = ZIPCODE),
+    global_reg_pm_lag4 = lag(global_reg_pm, 4, order_by = ZIPCODE),
+    global_reg_pm_lag5 = lag(global_reg_pm, 5, order_by = ZIPCODE),
     # krig pm
-    krig_pm_lag1 = lag(krig_pm, 1),
-    krig_pm_lag2 = lag(krig_pm, 2),
-    krig_pm_lag3 = lag(krig_pm, 3),
-    krig_pm_lag4 = lag(krig_pm, 4),
-    krig_pm_lag5 = lag(krig_pm, 5),   
+    krig_pm_lag1 = lag(krig_pm, 1, order_by = ZIPCODE),
+    krig_pm_lag2 = lag(krig_pm, 2, order_by = ZIPCODE),
+    krig_pm_lag3 = lag(krig_pm, 3, order_by = ZIPCODE),
+    krig_pm_lag4 = lag(krig_pm, 4, order_by = ZIPCODE),
+    krig_pm_lag5 = lag(krig_pm, 5, order_by = ZIPCODE),   
     # background pm
-    background_pm_lag1 = lag(background_pm, 1),
-    background_pm_lag2 = lag(background_pm, 2),
-    background_pm_lag3 = lag(background_pm, 3),
-    background_pm_lag4 = lag(background_pm, 4),
-    background_pm_lag5 = lag(background_pm, 5),   
+    background_pm_lag1 = lag(background_pm, 1, order_by = ZIPCODE),
+    background_pm_lag2 = lag(background_pm, 2, order_by = ZIPCODE),
+    background_pm_lag3 = lag(background_pm, 3, order_by = ZIPCODE),
+    background_pm_lag4 = lag(background_pm, 4, order_by = ZIPCODE),
+    background_pm_lag5 = lag(background_pm, 5, order_by = ZIPCODE),   
     # geo_smk_pm 
-    geo_smk_pm_lag1 = lag(geo_smk_pm, 1),
-    geo_smk_pm_lag2 = lag(geo_smk_pm, 2),
-    geo_smk_pm_lag3 = lag(geo_smk_pm, 3),
-    geo_smk_pm_lag4 = lag(geo_smk_pm, 4),
-    geo_smk_pm_lag5 = lag(geo_smk_pm, 5),
+    geo_smk_pm_lag1 = lag(geo_smk_pm, 1, order_by = ZIPCODE),
+    geo_smk_pm_lag2 = lag(geo_smk_pm, 2, order_by = ZIPCODE),
+    geo_smk_pm_lag3 = lag(geo_smk_pm, 3, order_by = ZIPCODE),
+    geo_smk_pm_lag4 = lag(geo_smk_pm, 4, order_by = ZIPCODE),
+    geo_smk_pm_lag5 = lag(geo_smk_pm, 5, order_by = ZIPCODE),
     # global smk pm
-    global_smk_pm_lag1 = lag(global_smk_pm, 1),
-    global_smk_pm_lag2 = lag(global_smk_pm, 2),
-    global_smk_pm_lag3 = lag(global_smk_pm, 3),
-    global_smk_pm_lag4 = lag(global_smk_pm, 4),
-    global_smk_pm_lag5 = lag(global_smk_pm, 5),
+    global_smk_pm_lag1 = lag(global_smk_pm, 1, order_by = ZIPCODE),
+    global_smk_pm_lag2 = lag(global_smk_pm, 2, order_by = ZIPCODE),
+    global_smk_pm_lag3 = lag(global_smk_pm, 3, order_by = ZIPCODE),
+    global_smk_pm_lag4 = lag(global_smk_pm, 4, order_by = ZIPCODE),
+    global_smk_pm_lag5 = lag(global_smk_pm, 5, order_by = ZIPCODE),
     # krig smk pm
-    krig_smk_pm_lag1 = lag(krig_smk_pm, 1),
-    krig_smk_pm_lag2 = lag(krig_smk_pm, 2),
-    krig_smk_pm_lag3 = lag(krig_smk_pm, 3),
-    krig_smk_pm_lag4 = lag(krig_smk_pm, 4),
-    krig_smk_pm_lag5 = lag(krig_smk_pm, 5),
+    krig_smk_pm_lag1 = lag(krig_smk_pm, 1, order_by = ZIPCODE),
+    krig_smk_pm_lag2 = lag(krig_smk_pm, 2, order_by = ZIPCODE),
+    krig_smk_pm_lag3 = lag(krig_smk_pm, 3, order_by = ZIPCODE),
+    krig_smk_pm_lag4 = lag(krig_smk_pm, 4, order_by = ZIPCODE),
+    krig_smk_pm_lag5 = lag(krig_smk_pm, 5, order_by = ZIPCODE),
     # temp
-    wrf_temp_lag1 = lag(wrf_temp, 1),
-    wrf_temp_lag2 = lag(wrf_temp, 2),
-    wrf_temp_lag3 = lag(wrf_temp, 3),
-    wrf_temp_lag4 = lag(wrf_temp, 4),
-    wrf_temp_lag5 = lag(wrf_temp, 5)) %>% 
+    wrf_temp_lag1 = lag(wrf_temp, 1, order_by = ZIPCODE),
+    wrf_temp_lag2 = lag(wrf_temp, 2, order_by = ZIPCODE),
+    wrf_temp_lag3 = lag(wrf_temp, 3, order_by = ZIPCODE),
+    wrf_temp_lag4 = lag(wrf_temp, 4, order_by = ZIPCODE),
+    wrf_temp_lag5 = lag(wrf_temp, 5, order_by = ZIPCODE)) %>% 
+  # ungroup by zip
+  ungroup(ZIPCODE) %>% 
   # attach a zip indicator for each smoke variable
   setNames(paste(colnames(.), "zip", sep="_")) %>% 
   # remove the '_zip' from the zipcode and date variable 
   rename(ZIPCODE = ZIPCODE_zip, date = date_zip)
 
-# check 
-summary(zip_smoke_w_lag) # looks good
+# # check 
+# check <- zip_smoke_w_lag %>% 
+#   select(ZIPCODE, date, geo_smk_pm_zip, geo_smk_pm_lag1_zip,
+#          geo_smk_pm_lag2_zip, geo_smk_pm_lag3_zip) # looks good
 
 # County PM2.5 estimates
 # create lag variables that take smoke values from n previous days for county
 county_smoke_w_lag <- county_smoke %>% arrange(county, date) %>%
+  group_by(county) %>% 
   # wrf
-  mutate(wrf_pm_lag1 = lag(wrf_pm, 1), 
-    wrf_pm_lag2 = lag(wrf_pm, 2),
-    wrf_pm_lag3 = lag(wrf_pm, 3),
-    wrf_pm_lag4 = lag(wrf_pm, 4),
-    wrf_pm_lag5 = lag(wrf_pm, 5),
+  mutate(wrf_pm_lag1 = lag(wrf_pm, 1, order_by = county), 
+    wrf_pm_lag2 = lag(wrf_pm, 2, order_by = county),
+    wrf_pm_lag3 = lag(wrf_pm, 3, order_by = county),
+    wrf_pm_lag4 = lag(wrf_pm, 4, order_by = county),
+    wrf_pm_lag5 = lag(wrf_pm, 5, order_by = county),
     # wrf no fire lag
-    wrf_nf_pm_lag1 = lag(wrf_nf_pm, 1),
-    wrf_nf_pm_lag2 = lag(wrf_nf_pm, 2),
-    wrf_nf_pm_lag3 = lag(wrf_nf_pm, 3),
-    wrf_nf_pm_lag4 = lag(wrf_nf_pm, 4),
-    wrf_nf_pm_lag5 = lag(wrf_nf_pm, 5),
+    wrf_nf_pm_lag1 = lag(wrf_nf_pm, 1, order_by = county),
+    wrf_nf_pm_lag2 = lag(wrf_nf_pm, 2, order_by = county),
+    wrf_nf_pm_lag3 = lag(wrf_nf_pm, 3, order_by = county),
+    wrf_nf_pm_lag4 = lag(wrf_nf_pm, 4, order_by = county),
+    wrf_nf_pm_lag5 = lag(wrf_nf_pm, 5, order_by = county),
     # wrf_smk_pm
-    wrf_smk_pm_lag1 = lag(wrf_smk_pm, 1),
-    wrf_smk_pm_lag2 = lag(wrf_smk_pm, 2),
-    wrf_smk_pm_lag3 = lag(wrf_smk_pm, 3),
-    wrf_smk_pm_lag4 = lag(wrf_smk_pm, 4),
-    wrf_smk_pm_lag5 = lag(wrf_smk_pm, 5),
+    wrf_smk_pm_lag1 = lag(wrf_smk_pm, 1, order_by = county),
+    wrf_smk_pm_lag2 = lag(wrf_smk_pm, 2, order_by = county),
+    wrf_smk_pm_lag3 = lag(wrf_smk_pm, 3, order_by = county),
+    wrf_smk_pm_lag4 = lag(wrf_smk_pm, 4, order_by = county),
+    wrf_smk_pm_lag5 = lag(wrf_smk_pm, 5, order_by = county),
     # geo weighted pm
-    geo_wt_pm_lag1 = lag(geo_wt_pm, 1),
-    geo_wt_pm_lag2 = lag(geo_wt_pm, 2),
-    geo_wt_pm_lag3 = lag(geo_wt_pm, 3),
-    geo_wt_pm_lag4 = lag(geo_wt_pm, 4),
-    geo_wt_pm_lag5 = lag(geo_wt_pm, 5),
+    geo_wt_pm_lag1 = lag(geo_wt_pm, 1, order_by = county),
+    geo_wt_pm_lag2 = lag(geo_wt_pm, 2, order_by = county),
+    geo_wt_pm_lag3 = lag(geo_wt_pm, 3, order_by = county),
+    geo_wt_pm_lag4 = lag(geo_wt_pm, 4, order_by = county),
+    geo_wt_pm_lag5 = lag(geo_wt_pm, 5, order_by = county),
     # global reg pm
-    global_reg_pm_lag1 = lag(global_reg_pm, 1),
-    global_reg_pm_lag2 = lag(global_reg_pm, 2),
-    global_reg_pm_lag3 = lag(global_reg_pm, 3),
-    global_reg_pm_lag4 = lag(global_reg_pm, 4),
-    global_reg_pm_lag5 = lag(global_reg_pm, 5),
+    global_reg_pm_lag1 = lag(global_reg_pm, 1, order_by = county),
+    global_reg_pm_lag2 = lag(global_reg_pm, 2, order_by = county),
+    global_reg_pm_lag3 = lag(global_reg_pm, 3, order_by = county),
+    global_reg_pm_lag4 = lag(global_reg_pm, 4, order_by = county),
+    global_reg_pm_lag5 = lag(global_reg_pm, 5, order_by = county),
     # krig pm
-    krig_pm_lag1 = lag(krig_pm, 1),
-    krig_pm_lag2 = lag(krig_pm, 2),
-    krig_pm_lag3 = lag(krig_pm, 3),
-    krig_pm_lag4 = lag(krig_pm, 4),
-    krig_pm_lag5 = lag(krig_pm, 5),   
+    krig_pm_lag1 = lag(krig_pm, 1, order_by = county),
+    krig_pm_lag2 = lag(krig_pm, 2, order_by = county),
+    krig_pm_lag3 = lag(krig_pm, 3, order_by = county),
+    krig_pm_lag4 = lag(krig_pm, 4, order_by = county),
+    krig_pm_lag5 = lag(krig_pm, 5, order_by = county),   
     # background pm
-    background_pm_lag1 = lag(background_pm, 1),
-    background_pm_lag2 = lag(background_pm, 2),
-    background_pm_lag3 = lag(background_pm, 3),
-    background_pm_lag4 = lag(background_pm, 4),
-    background_pm_lag5 = lag(background_pm, 5),   
+    background_pm_lag1 = lag(background_pm, 1, order_by = county),
+    background_pm_lag2 = lag(background_pm, 2, order_by = county),
+    background_pm_lag3 = lag(background_pm, 3, order_by = county),
+    background_pm_lag4 = lag(background_pm, 4, order_by = county),
+    background_pm_lag5 = lag(background_pm, 5, order_by = county),   
     # geo_smk_pm 
-    geo_smk_pm_lag1 = lag(geo_smk_pm, 1),
-    geo_smk_pm_lag2 = lag(geo_smk_pm, 2),
-    geo_smk_pm_lag3 = lag(geo_smk_pm, 3),
-    geo_smk_pm_lag4 = lag(geo_smk_pm, 4),
-    geo_smk_pm_lag5 = lag(geo_smk_pm, 5),
+    geo_smk_pm_lag1 = lag(geo_smk_pm, 1, order_by = county),
+    geo_smk_pm_lag2 = lag(geo_smk_pm, 2, order_by = county),
+    geo_smk_pm_lag3 = lag(geo_smk_pm, 3, order_by = county),
+    geo_smk_pm_lag4 = lag(geo_smk_pm, 4, order_by = county),
+    geo_smk_pm_lag5 = lag(geo_smk_pm, 5, order_by = county),
     # global smk pm
-    global_smk_pm_lag1 = lag(global_smk_pm, 1),
-    global_smk_pm_lag2 = lag(global_smk_pm, 2),
-    global_smk_pm_lag3 = lag(global_smk_pm, 3),
-    global_smk_pm_lag4 = lag(global_smk_pm, 4),
-    global_smk_pm_lag5 = lag(global_smk_pm, 5),
+    global_smk_pm_lag1 = lag(global_smk_pm, 1, order_by = county),
+    global_smk_pm_lag2 = lag(global_smk_pm, 2, order_by = county),
+    global_smk_pm_lag3 = lag(global_smk_pm, 3, order_by = county),
+    global_smk_pm_lag4 = lag(global_smk_pm, 4, order_by = county),
+    global_smk_pm_lag5 = lag(global_smk_pm, 5, order_by = county),
     # krig smk pm
-    krig_smk_pm_lag1 = lag(krig_smk_pm, 1),
-    krig_smk_pm_lag2 = lag(krig_smk_pm, 2),
-    krig_smk_pm_lag3 = lag(krig_smk_pm, 3),
-    krig_smk_pm_lag4 = lag(krig_smk_pm, 4),
-    krig_smk_pm_lag5 = lag(krig_smk_pm, 5),
+    krig_smk_pm_lag1 = lag(krig_smk_pm, 1, order_by = county),
+    krig_smk_pm_lag2 = lag(krig_smk_pm, 2, order_by = county),
+    krig_smk_pm_lag3 = lag(krig_smk_pm, 3, order_by = county),
+    krig_smk_pm_lag4 = lag(krig_smk_pm, 4, order_by = county),
+    krig_smk_pm_lag5 = lag(krig_smk_pm, 5, order_by = county),
     # temp
-    wrf_temp_lag1 = lag(wrf_temp, 1),
-    wrf_temp_lag2 = lag(wrf_temp, 2),
-    wrf_temp_lag3 = lag(wrf_temp, 3),
-    wrf_temp_lag4 = lag(wrf_temp, 4),
-    wrf_temp_lag5 = lag(wrf_temp, 5)) %>% 
+    wrf_temp_lag1 = lag(wrf_temp, 1, order_by = county),
+    wrf_temp_lag2 = lag(wrf_temp, 2, order_by = county),
+    wrf_temp_lag3 = lag(wrf_temp, 3, order_by = county),
+    wrf_temp_lag4 = lag(wrf_temp, 4, order_by = county),
+    wrf_temp_lag5 = lag(wrf_temp, 5, order_by = county), order_by = county) %>% 
+  # ungroup county
+  ungroup(county) %>% 
   # attach a zip indicator for each smoke variable
   setNames(paste(colnames(.), "county", sep="_")) %>% 
   # remove the '_zip' from the zipcode and date variable 
   rename(county = county_county, date = date_county)
 
 # check 
-summary(county_smoke_w_lag) # looks good
+# check <- county_smoke_w_lag %>% 
+#    select(county, date, geo_smk_pm_county, geo_smk_pm_lag1_county,
+#           geo_smk_pm_lag2_county, geo_smk_pm_lag3_county) # looks good
 
 # Infile the Permanent Cleaned CHARS 2012 DataFrame ----------------------------
 # Put this file on the atmos server ASAP
@@ -204,6 +215,8 @@ n_period <- chars_2012_conf_df %>%
   nrow()
 
 n_period
+
+
 # look up admit type, may want to subset to specifc admit
 # ADM_TYPE variable: 1 = emergency, 2 = urgent, 3 = elective, 4 = newborn
 # 5 = trauma, 9 = info not available
