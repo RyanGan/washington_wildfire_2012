@@ -43,6 +43,8 @@ resp_casecross <- read_csv(paste(health_path,
 # asthma
 asthma_casecross <- read_csv(paste(health_path, 
   "asthma1_jul_to_oct_time_strat_casecross.csv", sep = "/"))
+glimpse(asthma_casecross)
+
 # copd 
 copd_casecross <- read_csv(paste(health_path, 
   "copd1_jul_to_oct_time_strat_casecross.csv", sep = "/"))
@@ -366,6 +368,7 @@ datalist <- list()
 # Producing conditional logit model estimates loop 
 for(i in 1:length(df_list)){
 
+  i <- 2
   # dataframe to loop through
   df_to_loop <- data.frame(df_list[i])
   # indication of column
@@ -380,6 +383,7 @@ for(i in 1:length(df_list)){
   # extract pm values and divide by 10 and ordered by how I want to present in paper
   #which(colnames(df_to_loop)=="wrf_pbl_county") # code to find column numbers
   pm_estimates_df <- df_to_loop[, c(86, 93, 91, 92)]/10  # create 10 unit increases
+  
   
   # dataframe for analysis creation
   # bind columns back together 
@@ -558,9 +562,6 @@ daily_county_met <- county_met %>%
          cdc_prcp_lag2 = lag(daily_meanPrcp, 2, order_by = county),
          cdc_prcp_lag3 = lag(daily_meanPrcp, 3, order_by = county)) 
 
-
-daily_meanRH + daily_meanT + daily_meanWS + 
-                      daily_meanPrcp
 head(daily_county_met)
   
 ```
@@ -592,6 +593,7 @@ datalist <- list()
 # Producing conditional logit model estimates loop 
 for(i in 1:length(df_list)){
 
+  i <- 2
 # dataframe to loop through
   df_to_loop <- data.frame(df_list[i])
   # indication of column
@@ -600,12 +602,12 @@ for(i in 1:length(df_list)){
   outcome_name <- outcome_list[i]
 
   # extract covariates from dataframe
-  covariates_df <- df_to_loop[, c(1:16, 94:95, 151:157)]
-  
+  covariates_df <- df_to_loop[, c(1:16, 95:96, 151:157)]
+
   # modified to select county estimates
   # extract pm values and divide by 10 and ordered by how I want to present in paper
   #which(colnames(df_to_loop)=="wrf_pbl_county") # code to find column numbers
-  pm_estimates_df <- df_to_loop[, c(86, 93, 91, 92)]/10  # create 10 unit increases
+  pm_estimates_df <- df_to_loop[, c(87, 94, 93, 92)]/10  # create 10 unit increases
   
   # dataframe for analysis creation
   # bind columns back together 

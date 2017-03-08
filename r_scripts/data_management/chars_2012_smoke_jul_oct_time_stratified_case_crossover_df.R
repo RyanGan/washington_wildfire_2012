@@ -192,7 +192,7 @@ county_smoke_w_lag <- county_smoke %>% arrange(county, date) %>%
     wrf_temp_lag2 = lag(wrf_temp, 2, order_by = county),
     wrf_temp_lag3 = lag(wrf_temp, 3, order_by = county),
     wrf_temp_lag4 = lag(wrf_temp, 4, order_by = county),
-    wrf_temp_lag5 = lag(wrf_temp, 5, order_by = county), order_by = county) %>% 
+    wrf_temp_lag5 = lag(wrf_temp, 5, order_by = county)) %>% 
   # ungroup county
   ungroup(county) %>% 
   # attach a zip indicator for each smoke variable
