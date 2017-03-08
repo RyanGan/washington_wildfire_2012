@@ -22,8 +22,8 @@ library(dplyr)
 library(readr)
 library(lubridate) # working with date
 # parallel computing libraries
-#library(foreach) 
-#library(doParallel)
+library(foreach) 
+library(doParallel)
 
 # Read in smoke data created in loop -------------------------------------------
 
@@ -265,13 +265,12 @@ summary(chars_2012_to_loop)
 
 
 # Setup for parallel computing before for loop ---------------------------------
-#cores <- detectCores()
-#cl <- makeCluster(cores) # use half the cores on the vet cluster
-#registerDoParallel(cl)
+cores <- detectCores()
+cl <- makeCluster(cores) # use half the cores on the vet cluster
+registerDoParallel(cl)
 
 # Case-crossover datasets ------------------------------------------------------
 
-glimpse(chars_2012_to_loop)
 
 # set variable list
 var_list <- c('resp1', 'asthma1', 'copd_ex1', 'copd1', 'pneum1', 'acute_bronch1',
@@ -283,34 +282,34 @@ var_list <- c('resp1', 'asthma1', 'copd_ex1', 'copd1', 'pneum1', 'acute_bronch1'
 
 start <- Sys.time()
 # parallele computing line
-#foreach(j=1:length(var_list)) %dopar% { # begin first loop of variable names (outcomes)
+foreach(j=1:length(var_list)) %dopar% { # begin first loop of variable names (outcomes)
 
-# 1 core standard line
-for(j in 1:length(var_list)){
+# standard for statement without parallel computing
+#for(j in 1:length(var_list)){
 
 # Case-Crossover loop ----------------------------------------------------------
+outcome_name <- var_list[j]
 
-outcome_col <- which(colnames(chars_2012_to_loop) == j) # use to keep outcome var
 
-outcome_id <- chars_2012_to_loop %>%
-              filter(chars_2012_to_loop[[j]] == 1) %>% # jth outcome
-              filter(admit_date_impute >= '2012-07-01' & 
-                     admit_date_impute <= '2012-10-31') %>% 
-              filter(STATERES == 'WA') %>% # limit to washington 
-              arrange(admit_date_impute) %>%
-              # commenting out id as I have patientid now  
-              # mutate(id = seq(1, nrow(.), by = 1)) %>% # create subject id
-              select(PATIENTID, (outcome_col), # keep in bracket for outcome var num
-                    admit_date_impute, DIS_DATE, ADM_TYPE, LENSTAYD, ZIPCODE, 
-                    COUNTYRES, county, AGE, SEX, sex_num, race_nhw, age_cat) %>%
-              mutate(date_admit = admit_date_impute,
-                     date_discharge = DIS_DATE,
-                     length_stay = LENSTAYD) %>%
-              arrange(PATIENTID, admit_date_impute) %>% 
-              # generate a enumerated variable to indicate number of obs by patid
-              group_by(PATIENTID) %>% 
-              mutate(obs_num = seq_along(PATIENTID)) %>% 
-              select(-admit_date_impute, -DIS_DATE, -LENSTAYD)
+outcome_id <- chars_2012_to_loop %>% 
+  filter(chars_2012_to_loop[[var_list[j]]] == 1) %>%  # jth outcome
+  filter(admit_date_impute >= '2012-07-01' & 
+         admit_date_impute <= '2012-10-31') %>% 
+  filter(STATERES == 'WA') %>% # limit to washington 
+  filter(ADM_TYPE == 1 | ADM_TYPE == 2) %>% # limit to ER/Urgent care visits
+  arrange(admit_date_impute) %>%
+  # limit to 1 visit per subject
+  select(PATIENTID, (outcome_col), # keep in bracket for outcome var num
+        admit_date_impute, DIS_DATE, ADM_TYPE, LENSTAYD, ZIPCODE, 
+        COUNTYRES, county, AGE, SEX, sex_num, race_nhw, age_cat) %>%
+  mutate(date_admit = admit_date_impute,
+         date_discharge = DIS_DATE,
+         length_stay = LENSTAYD) %>%
+  arrange(PATIENTID, admit_date_impute) %>% 
+  # generate a enumerated variable to indicate number of obs by patid
+  group_by(PATIENTID) %>% 
+  mutate(obs_num = seq_along(PATIENTID)) %>% 
+  select(-admit_date_impute, -DIS_DATE, -LENSTAYD)
 
 # I want to remove people with multiple visits
 # find people with multiple visits and make an indicator
@@ -325,16 +324,17 @@ single_visits <- outcome_id %>% left_join(outcome_count, by = 'PATIENTID') %>%
 # for asthma: 1765 - 1638
 # lost 127 observations with multiple visits
 
-outcome_col2 <- which(colnames(single_visits) == j) # use to keep outcome var
+outcome_col2 <- which(colnames(single_visits) == outcome_name) # use to keep outcome var
 
 # create dataset to populate
 id_date_df <- data_frame()
 
 # begin second loop to create counterfactual observations for each case subject
 # parallele computing line 
-#       foreach(i=1:nrow(single_visits)) %dopar% {
-# standard line
-	for(i in 1:nrow(single_visits)){
+  foreach(i=1:nrow(single_visits)) %dopar% {
+
+#  standard line
+#	for(i in 1:nrow(single_visits)){
          # code dates for each id up to two months before and after the event (56 days)
          # note 10/10/16, trying the entire referent periods of 126
          date <- seq(as.Date(single_visits[[i, 12]] - 126), 
@@ -354,44 +354,45 @@ id_date_df <- data_frame()
          id_date <- data_frame(date) %>% bind_cols(cov_df)
          # iteration which binds rows of unique ids
          id_date_df <- bind_rows(id_date_df, id_date)
-                                    } # end inner loop
+      } # end inner loop
 
-# join with outcome
-outcome_casecross <- id_date_df %>% 
-  mutate(date_admit = as.Date(date_admit, '%Y-%m-%d')) %>%
-  mutate(outcome = ifelse(date_admit == date, 1, 0)) %>%
-  # filter to July 1st to Oct 31st
-  filter(date >= "2012-07-1" & date <= "2012-10-31") %>% 
-  # join with zip-level pm estimates 
-  left_join(zip_smoke_w_lag, by = c("date", "ZIPCODE")) %>%
-  # join with county-level pm estimates
-  left_join(county_smoke_w_lag, by = c("date", "county")) %>% 
-  # create variables
-  mutate(day = as.factor(weekdays(date)),
-    day_admit = as.factor(weekdays(date_admit)),
-    month_smk = month(date),
-    month_admit = month(date_admit),
-    los = as.numeric(date_discharge - date_admit), 
-    season_admit = ifelse(date_admit >= "2012-06-22" &  date_admit <= "2012-09-22",
-                          "summer",
-                   ifelse(date_admit >= "2012-09-23" & date_admit <= "2012-12-21",
-                          "fall", "other")),
-    season_smk = ifelse(date >= "2012-06-22" &  date <= "2012-09-22", "summer",
-                   ifelse(date >= "2012-09-23" & date <= "2012-12-21", "fall",
-                          "other"))) %>%
-  arrange(PATIENTID, date) # order by id and date
-
-# checks
-#glimpse(outcome_casecross)
-#which(colnames(outcome_casecross)=='geo_wt_pm_county')
-#check <- outcome_casecross[, c(1:16, 20, 87, 151:157)]
-
-# Create a permanent case-cross over datasets
-file_name <- paste0('../../data/health_data/', j, 
-		    '_jul_to_oct_time_strat_casecross.csv')
-
-# write permanent dataset
-write_csv(outcome_casecross, file_name)
+  # join with outcome
+  outcome_casecross <- id_date_df %>% 
+    mutate(date_admit = as.Date(date_admit, '%Y-%m-%d')) %>%
+    mutate(outcome = ifelse(date_admit == date, 1, 0)) %>%
+    # filter to July 1st to Oct 31st
+    filter(date >= "2012-07-1" & date <= "2012-10-31") %>% 
+    # join with zip-level pm estimates 
+    left_join(zip_smoke_w_lag, by = c("date", "ZIPCODE")) %>%
+    # join with county-level pm estimates
+    left_join(county_smoke_w_lag, by = c("date", "county")) %>% 
+    # create variables
+    mutate(day = as.factor(weekdays(date)),
+      day_admit = as.factor(weekdays(date_admit)),
+      month_smk = month(date),
+      month_admit = month(date_admit),
+      los = as.numeric(date_discharge - date_admit), 
+      season_admit = ifelse(date_admit >= "2012-06-22" &  
+                            date_admit <= "2012-09-22", "summer",
+                     ifelse(date_admit >= "2012-09-23" & 
+                            date_admit <= "2012-12-21", "fall", "other")),
+      season_smk = ifelse(date >= "2012-06-22" &  
+                          date <= "2012-09-22", "summer",
+                     ifelse(date >= "2012-09-23" & 
+                            date <= "2012-12-21", "fall", "other"))) %>%
+    arrange(PATIENTID, date) # order by id and date
+  
+  # checks
+  #glimpse(outcome_casecross)
+  #which(colnames(outcome_casecross)=='geo_wt_pm_county')
+  #check <- outcome_casecross[, c(1:16, 20, 87, 151:157)]
+  
+  # Create a permanent case-cross over datasets
+  file_name <- paste0('../../data/health_data/', j, 
+  		    '_jul_to_oct_time_strat_casecross.csv')
+  
+  # write permanent dataset
+  write_csv(outcome_casecross, file_name)
 
       } # End of the overall loop
 
