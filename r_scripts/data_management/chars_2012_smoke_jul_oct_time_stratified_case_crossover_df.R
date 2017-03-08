@@ -22,8 +22,8 @@ library(dplyr)
 library(readr)
 library(lubridate) # working with date
 # parallel computing libraries
-library(foreach) 
-library(doParallel)
+#library(foreach) 
+#library(doParallel)
 
 # Read in smoke data created in loop -------------------------------------------
 
@@ -265,9 +265,9 @@ summary(chars_2012_to_loop)
 
 
 # Setup for parallel computing before for loop ---------------------------------
-cores <- detectCores()
-cl <- makeCluster(cores/2) # use half the cores on the vet cluster
-registerDoParallel(cl)
+#cores <- detectCores()
+#cl <- makeCluster(cores) # use half the cores on the vet cluster
+#registerDoParallel(cl)
 
 # Case-crossover datasets ------------------------------------------------------
 
@@ -282,7 +282,11 @@ var_list <- c('resp1', 'asthma1', 'copd_ex1', 'copd1', 'pneum1', 'acute_bronch1'
 # still to large to efficiently make datasets on this keyboard. Need to refine.
 
 start <- Sys.time()
-foreach(j=1:length(var_list)) %dopar% { # begin first loop of variable names (outcomes)
+# parallele computing line
+#foreach(j=1:length(var_list)) %dopar% { # begin first loop of variable names (outcomes)
+
+# 1 core standard line
+for(j in 1:length(var_list)){
 
 # Case-Crossover loop ----------------------------------------------------------
 
@@ -327,7 +331,10 @@ outcome_col2 <- which(colnames(single_visits) == j) # use to keep outcome var
 id_date_df <- data_frame()
 
 # begin second loop to create counterfactual observations for each case subject
-        foreach(i=1:nrow(single_visits)) %dopar% {
+# parallele computing line 
+#       foreach(i=1:nrow(single_visits)) %dopar% {
+# standard line
+	for(i in 1:nrow(single_visits)){
          # code dates for each id up to two months before and after the event (56 days)
          # note 10/10/16, trying the entire referent periods of 126
          date <- seq(as.Date(single_visits[[i, 12]] - 126), 
@@ -335,7 +342,7 @@ id_date_df <- data_frame()
                      as.Date(single_visits[[i, 12]] + 126), by = '1 week') 
 
          # covariates to preserve
-         covariate <- single_visits[i, ]%>% 
+         covariate <- single_visits[i, ] %>% 
                 select(PATIENTID, (outcome_col2), ZIPCODE, COUNTYRES, county, 
                        ADM_TYPE, date_admit, multi_obs, date_discharge, 
                        length_stay, AGE, age_cat, sex_num, race_nhw)
