@@ -268,6 +268,13 @@ summary(chars_2012_to_loop)
 cores <- detectCores()
 cl <- makeCluster(cores) # use half the cores on the vet cluster
 registerDoParallel(cl)
+# load dplyr and lubridate packages on each cluster
+clusterCall(cl, function() library(dplyr))
+clusterCall(cl, function() library(lubridate))
+clusterCall(cl, function() library(readr))
+# since I have another foreach loop, I need to load foreach on the clusters
+clusterCall(cl, function() library(foreach))
+clusterCall(cl, function() library(doParallel))
 
 # Case-crossover datasets ------------------------------------------------------
 
@@ -290,6 +297,7 @@ foreach(j=1:length(var_list)) %dopar% { # begin first loop of variable names (ou
 # Case-Crossover loop ----------------------------------------------------------
 outcome_name <- var_list[j]
 
+outcome_col <- which(colnames(chars_2012_to_loop) == outcome_name)
 
 outcome_id <- chars_2012_to_loop %>% 
   filter(chars_2012_to_loop[[var_list[j]]] == 1) %>%  # jth outcome
@@ -329,12 +337,24 @@ outcome_col2 <- which(colnames(single_visits) == outcome_name) # use to keep out
 # create dataset to populate
 id_date_df <- data_frame()
 
+# I likely need to create a second cluster
+#cores2 <- detectCores()
+#cl2 <- makeCluster(cores2) # use half the cores on the vet cluster
+#registerDoParallel(cl2)
+# load dplyr and lubridate packages on each cluster
+#clusterCall(cl2, function() library(dplyr))
+#clusterCall(cl2, function() library(lubridate))
+#clusterCall(cl2, function() library(readr))
+# since I have another foreach loop, I need to load foreach on the clusters
+#clusterCall(cl2, function() library(foreach))
+#clusterCall(cl2, function() library(doParallel))
+
 # begin second loop to create counterfactual observations for each case subject
 # parallele computing line 
-  foreach(i=1:nrow(single_visits)) %dopar% {
+#  foreach(i=1:nrow(single_visits)) %dopar% {
 
 #  standard line
-#	for(i in 1:nrow(single_visits)){
+	for(i in 1:nrow(single_visits)){
          # code dates for each id up to two months before and after the event (56 days)
          # note 10/10/16, trying the entire referent periods of 126
          date <- seq(as.Date(single_visits[[i, 12]] - 126), 
@@ -355,6 +375,9 @@ id_date_df <- data_frame()
          # iteration which binds rows of unique ids
          id_date_df <- bind_rows(id_date_df, id_date)
       } # end inner loop
+
+# stop second cluster
+#stopCluster(cl2)
 
   # join with outcome
   outcome_casecross <- id_date_df %>% 
@@ -388,7 +411,7 @@ id_date_df <- data_frame()
   #check <- outcome_casecross[, c(1:16, 20, 87, 151:157)]
   
   # Create a permanent case-cross over datasets
-  file_name <- paste0('../../data/health_data/', j, 
+  file_name <- paste0('../../data/health_data/', outcome_name, 
   		    '_jul_to_oct_time_strat_casecross.csv')
   
   # write permanent dataset
