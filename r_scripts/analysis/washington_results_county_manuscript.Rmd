@@ -267,19 +267,22 @@ for(i in 1:length(df_list)){
   # outcome name
   outcome_name <- outcome_list[i]
 
+#  which(colnames(df_to_loop)=="day") # code to find column numbers
+    
   # dataframe for analysis creation
   # bind columns back together 
-  df_analysis <- df_to_loop %>% select(c(1:16, 19, 27:28, 151:155)) %>% 
+  df_analysis <- df_to_loop %>% select(c(1:16, 87, 95:96, 152:158)) %>% 
     # only look at outcomes
     filter(outcome == 1) %>%
     # left in only observations with estimates of smoke
-    filter(!is.na(wrf_smk_pm_zip)) %>% 
+    filter(!is.na(wrf_smk_pm_county)) %>% 
     # limit to emergency or urgent care
     filter(ADM_TYPE == 1 | ADM_TYPE == 2) %>% 
     # add another row that makes sure there is a person <15 in the dataframe
     # tricking xtabs to produce a 0 cell for the outcome for age <15
     add_row(outcome = 0, age_cat = 0)
-  
+
+    
   # cross tabs
   outcome_n <- xtabs(~ outcome, df_analysis)
   cross_tab_age <- xtabs(~ outcome + age_cat, df_analysis)
@@ -368,7 +371,6 @@ datalist <- list()
 # Producing conditional logit model estimates loop 
 for(i in 1:length(df_list)){
 
-  i <- 2
   # dataframe to loop through
   df_to_loop <- data.frame(df_list[i])
   # indication of column
@@ -377,13 +379,12 @@ for(i in 1:length(df_list)){
   outcome_name <- outcome_list[i]
 
   # extract covariates from dataframe
-  covariates_df <- df_to_loop[, c(1:16, 94:95, 151:157)] 
+  covariates_df <- df_to_loop[, c(1:16, 95:96, 152:158)] 
   
   # modified to select county estimates
   # extract pm values and divide by 10 and ordered by how I want to present in paper
-  #which(colnames(df_to_loop)=="wrf_pbl_county") # code to find column numbers
-  pm_estimates_df <- df_to_loop[, c(86, 93, 91, 92)]/10  # create 10 unit increases
-  
+  #which(colnames(df_to_loop)=="geo_smk_pm_county") # code to find column numbers
+  pm_estimates_df <- df_to_loop[, c(87, 94, 93, 92)]/10  # create 10 unit increases
   
   # dataframe for analysis creation
   # bind columns back together 
@@ -409,6 +410,7 @@ for(i in 1:length(df_list)){
   # fill in the outcome name for the dataframe before the loop
   point_estimates[, 1] <- outcome_name
 
+  #which(colnames(df_analysis)=="wrf_smk_pm_county")
 
   # second loop to run a model for each pm estimation method
     for(j in 26:29){
@@ -562,7 +564,7 @@ daily_county_met <- county_met %>%
          cdc_prcp_lag2 = lag(daily_meanPrcp, 2, order_by = county),
          cdc_prcp_lag3 = lag(daily_meanPrcp, 3, order_by = county)) 
 
-head(daily_county_met)
+#head(daily_county_met)
   
 ```
 
@@ -593,7 +595,6 @@ datalist <- list()
 # Producing conditional logit model estimates loop 
 for(i in 1:length(df_list)){
 
-  i <- 2
 # dataframe to loop through
   df_to_loop <- data.frame(df_list[i])
   # indication of column
@@ -602,12 +603,13 @@ for(i in 1:length(df_list)){
   outcome_name <- outcome_list[i]
 
   # extract covariates from dataframe
-  covariates_df <- df_to_loop[, c(1:16, 95:96, 151:157)]
-
+  covariates_df <- df_to_loop[, c(1:16, 95:96, 152:158)] 
+  
   # modified to select county estimates
   # extract pm values and divide by 10 and ordered by how I want to present in paper
-  #which(colnames(df_to_loop)=="wrf_pbl_county") # code to find column numbers
+  #which(colnames(df_to_loop)=="geo_smk_pm_county") # code to find column numbers
   pm_estimates_df <- df_to_loop[, c(87, 94, 93, 92)]/10  # create 10 unit increases
+  
   
   # dataframe for analysis creation
   # bind columns back together 
@@ -765,6 +767,8 @@ combined_point_est_df$p_val <- as.numeric(combined_point_est_df$p_val)
 
 ### Three-day moving lag (0-2) PM~2.5~ 
 
+These results also adjust for the CDC variables, which will be the most comparable to Rish's mortality estimates.
+
 ```{r time stratified design county 0 to 2 day avg, warning = F, echo = F, results='asis'} 
 # note above, results = 'asis' needed to print htmlTables
 
@@ -790,7 +794,7 @@ datalist <- list()
 # data wrangling ----
 # Producing conditional logit model estimates loop 
 for(i in 1:length(df_list)){
-i <- 2
+
 # dataframe to loop through
   df_to_loop <- data.frame(df_list[i])
   # indication of column
@@ -799,15 +803,14 @@ i <- 2
   outcome_name <- outcome_list[i]
 
   # extract covariates from dataframe
-  covariates_df <- df_to_loop[, c(1:16, 94, 146:150, 95, 151:157)]
+  covariates_df <- df_to_loop[, c(1:16, 95:96, 152:158)] 
 
   # modified to select county estimates
   # extract pm values and divide by 10 and ordered by how I want to present in paper
-  #which(colnames(df_to_loop)=="wrf_temp_lag5_county") # code to find column numbers
+  # which(colnames(df_to_loop)=="geo_smk_pm_county") # code to find column numbers
   # create moving average here
-  pm_estimates_df <- df_to_loop[, c(86, 106:110, 93, 141:145,
-                                    92, 136:140, 91, 131:135)]/10  # create 10 unit increases
-
+  pm_estimates_df <- df_to_loop[, c(87, 107:111, 94, 142:146,
+                                    93, 137:141, 92, 132:136)]/10  # create 10 unit increases
   
   # dataframe for analysis creation
   # bind columns back together 
@@ -827,10 +830,13 @@ i <- 2
            krig_smk_avg = (krig_smk_pm_county + krig_smk_pm_lag1_county + krig_smk_pm_lag2_county)/3,
            global_smk_avg = (global_smk_pm_county + global_smk_pm_lag1_county + global_smk_pm_lag2_county)/3,
            geo_smk_avg = (geo_smk_pm_county + geo_smk_pm_lag1_county + geo_smk_pm_lag2_county)/3,
-           temp_avg = (wrf_temp_county + wrf_temp_lag1_county + wrf_temp_lag2_county)/3,
-           )
+           cdc_temp_avg = (daily_meanT + cdc_temp_lag1 + cdc_temp_lag2)/3,
+           cdc_rh_avg = (daily_meanRH + cdc_rh_lag1 + cdc_rh_lag2)/3,
+           cdc_ws_avg = (daily_meanWS + cdc_ws_lag1 + cdc_ws_lag2)/3,
+           cdc_prcp_avg = (daily_meanPrcp + cdc_prcp_lag1 + cdc_prcp_lag2)/3)
+           
     # dataframe is already for the entire fire season, so I don't need to subset anymore
-  summary(df_analysis)
+  #glimpse(df_analysis)
   # empty df for table
   table_df <- data.frame()
   
@@ -843,19 +849,21 @@ i <- 2
   # fill in the outcome name for the dataframe before the loop
   point_estimates[, 1] <- outcome_name
 
-#which(colnames(df_analysis)=="geo_smk_avg")
+  #which(colnames(df_analysis)=="geo_smk_avg")
+  
   # second loop to run a model for each pm estimation method
-    for(j in 56:59){
+    for(j in 79:82){
 
       # variable to model 
       var_name <- colnames(df_analysis[j])
 
       # conditional logistic regression model
-      mod <- clogit(outcome ~ df_analysis[[j]] + temp_avg +
+      mod <- clogit(outcome ~ df_analysis[[j]] + cdc_temp_avg + cdc_rh_avg +
+                    cdc_ws_avg + cdc_prcp_avg +
                     strata(PATIENTID), df_analysis)
 
       # populate matrix
-      row_n <- j-55
+      row_n <- j-78
       
       point_estimates[row_n, 2] <- method_list[row_n]
       point_estimates[row_n, 3] <- mod$n
@@ -906,7 +914,7 @@ table_df <- combined_point_est_df %>% select(2, 3:7)
            padding.rgroup = "&nbsp;&nbsp;",
            css.cell = "padding-left: 0.5em; padding-right: .5em;", # cell space
            align = "llccccc", # column alignment,
-           tfoot="&dagger; Adjusted for temperature, accounting for subject. Time-stratified: referent periods matched to events on same day of week within July to October fire season. Smoke predictor is a moving lag average from 0 to 2 days."
+           tfoot="&dagger; Adjusted for CDC temperature, relatively humidity, wind speed, and precipitation. Accounting for subject. Time-stratified: referent periods matched to events on same day of week within July to October fire season. Smoke predictor is a moving lag average from 0 to 2 days."
             ) # end table
   
   print(tab)
@@ -961,7 +969,10 @@ combined_point_est_df$p_val <- as.numeric(combined_point_est_df$p_val)
 These results were of interest to Rish as some of his mortality data shows a significant association with a moving lag of smoke exposure. The 0-2 day average of PM~2.5~ concentrations is not too different compared to my other analyses. I think a big difference between mortality and these data is it may take a couple days of high exposure and physiologic processes that may eventually result in death, vs. asthma where the physiologic response to particulate matter is relatively quick.
 
 ### Lag Periods
+
 County-level assignment of PM~2.5~ lagged days analysis.
+
+START HERE
 
 ```{r time stratified design within fire season lags, echo = F, results='asis'} 
 # note above, results = 'asis' needed to print htmlTables
@@ -989,6 +1000,7 @@ datalist2 <- list()
 # Producing conditional logit model estimates loop 
 for(i in 1:length(df_list)){
   
+  i <- 2
   # dataframe to loop through
   df_to_loop <- data.frame(df_list[i])
   # indication of column
