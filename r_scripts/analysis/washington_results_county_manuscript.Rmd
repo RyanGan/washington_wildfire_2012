@@ -33,8 +33,8 @@ Rish wanted a couple key things
 # Set working directory and read in files --------------------------------------
 
 # relative path
-#health_path <- paste0("../../data/health_data")
-health_path <- paste0("./data/health_data")
+health_path <- paste0("../../data/health_data")
+# health_path <- paste0("./data/health_data")
 # Infile case-crossover dataframes ---------------------------------------------
 # Dataframes made in 'chars_3month_binary_smoke_may2016 script
 # resp exacerbations
@@ -554,15 +554,23 @@ daily_county_met <- county_met %>%
   mutate(cdc_temp_lag1 = lag(daily_meanT, 1, order_by = county),
          cdc_temp_lag2 = lag(daily_meanT, 2, order_by = county),
          cdc_temp_lag3 = lag(daily_meanT, 3, order_by = county),
+         cdc_temp_lag4 = lag(daily_meanT, 4, order_by = county),
+         cdc_temp_lag5 = lag(daily_meanT, 5, order_by = county),
          cdc_rh_lag1 = lag(daily_meanRH, 1, order_by = county),
          cdc_rh_lag2 = lag(daily_meanRH, 2, order_by = county),
          cdc_rh_lag3 = lag(daily_meanRH, 3, order_by = county),
+         cdc_rh_lag4 = lag(daily_meanRH, 4, order_by = county),
+         cdc_rh_lag5 = lag(daily_meanRH, 5, order_by = county),         
          cdc_ws_lag1 = lag(daily_meanWS, 1, order_by = county),
          cdc_ws_lag2 = lag(daily_meanWS, 2, order_by = county),
          cdc_ws_lag3 = lag(daily_meanWS, 3, order_by = county),
+         cdc_ws_lag4 = lag(daily_meanWS, 4, order_by = county),
+         cdc_ws_lag5 = lag(daily_meanWS, 5, order_by = county),
          cdc_prcp_lag1 = lag(daily_meanPrcp, 1, order_by = county),
          cdc_prcp_lag2 = lag(daily_meanPrcp, 2, order_by = county),
-         cdc_prcp_lag3 = lag(daily_meanPrcp, 3, order_by = county)) 
+         cdc_prcp_lag3 = lag(daily_meanPrcp, 3, order_by = county),
+         cdc_prcp_lag4 = lag(daily_meanPrcp, 4, order_by = county),
+         cdc_prcp_lag5 = lag(daily_meanPrcp, 5, order_by = county)) 
 
 #head(daily_county_met)
   
@@ -972,8 +980,6 @@ These results were of interest to Rish as some of his mortality data shows a sig
 
 County-level assignment of PM~2.5~ lagged days analysis.
 
-START HERE
-
 ```{r time stratified design within fire season lags, echo = F, results='asis'} 
 # note above, results = 'asis' needed to print htmlTables
 
@@ -1000,23 +1006,29 @@ datalist2 <- list()
 # Producing conditional logit model estimates loop 
 for(i in 1:length(df_list)){
   
-  i <- 2
   # dataframe to loop through
-  df_to_loop <- data.frame(df_list[i])
+  df_to_loop <- data.frame(df_list[i]) %>% 
+    left_join(daily_county_met, by = c("county", "date"))
+  
   # indication of column
   outcome <- colnames(df_to_loop[3])
   # outcome name
   outcome_name <- outcome_list[i]
   # extract covariates from dataframe
-  covariates_df <- df_to_loop[, c(1:16, 94, 146:150, 95, 151:157)]
+  covariates_df <- df_to_loop[, c(1:16, 95:96, 152:158)] 
   
   # extract pm values and divide by 10 and ordered
-  #which(colnames(df_to_loop)=="wrf_smk_pm_lag1_county") # code to find column numbers
-
-  pm_lag_list <- list(df_to_loop[, c(86, 106:110)]/10, df_to_loop[, c(93, 141:145)]/10,
-                  df_to_loop[, c(92, 136:140)]/10, df_to_loop[, c(91, 131:135)]/10)  # create 10 unit increases
-
-# need to think if I need a methods section (probably not since this is it)
+  pm_lag_list <- list(df_to_loop[, c(87, 107:111)]/10, 
+                      df_to_loop[, c(94, 142:146)]/10,
+                      df_to_loop[, c(93, 137:141)]/10, 
+                      df_to_loop[, c(92, 132:136)]/10)  # create 10 unit increases
+  
+  
+  # which(colnames(df_to_loop)=="cdc_prcp_lag5") # code to find column numbers
+  
+  cdc_lag_vars <- df_to_loop[, c(162, 175:179, 161, 180:184, 
+                                 164, 185:189, 163, 190:194)]
+ 
   
   # new loop for each element of the lag list 
   for(k in 1:4){
@@ -1027,33 +1039,34 @@ for(i in 1:length(df_list)){
     colnames(point_estimates) <- c('outcome', 'pm_method', 'lag', 'n', 'n_events', 
                                    'odds_ratio', 'lower95', 'upper95', 'se', 'p_val')
     
-    # fill in the outcome namedataframe before method loop
+    # fill in the outcome name dataframe before method loop
     point_estimates[, 1] <- outcome_name
-    # repeat the sex category 4 times for each pm method
+    # repeat 4 times for each pm method
     point_estimates[, 2] <- method_list[k]
 
     pm_test <- pm_lag_list[[k]]
 
     # dataframe for analysis creation
     # bind columns back together 
-    df_analysis <- cbind(covariates_df, pm_lag_list[[k]]) %>% 
-      # limit to emergency or urgent care
-      filter(ADM_TYPE == 1 | ADM_TYPE == 2) %>%
-      # the following code makes sure that the counterfactual values retained are 
-      # symetric in that number of obs before = number of obs after
-      mutate(obs_diff_admission = (date - date_admit)/7) 
-      # dataframe is already for the entire fire season, so I don't need to subset anymore
+    df_analysis <- cbind(covariates_df, pm_lag_list[[k]], cdc_lag_vars) 
 
   # loop to run a model for each lag 0-5
     for(j in 0:5){
- 
+
       # finding locations of columns in dataframe
-      #which(colnames(df_analysis)=="wrf_temp_zip")
+      #which(colnames(df_analysis)=="daily_meanPrcp")
 
       # set column number to evaluate for the pm lag method
-      pm_lag_colnum <- j + 31
-      # set column number of wrf temp lag to adjust for
-      temp_lag_colnum <- j + 17
+      pm_lag_colnum <- j + 26
+      # set column number of cdc temp lag to adjust for
+      temp_lag_colnum <- j + 32
+      # relative humidity
+      rh_lag_colnum <- j + 38
+      # wind speed
+      ws_lag_colnum <- j + 44
+      # precip
+      prcp_lag_colnum <- j + 50
+      
       # set row number to fill
       row_n <- j+1
       
@@ -1061,7 +1074,8 @@ for(i in 1:length(df_list)){
       if(nrow(df_analysis) != 0){
       # conditional logistic regression model
       mod <- clogit(outcome ~ df_analysis[[pm_lag_colnum]] + df_analysis[[temp_lag_colnum]] +
-                      strata(PATIENTID), df_analysis)
+                      df_analysis[[rh_lag_colnum]] + df_analysis[[ws_lag_colnum]] +
+                      df_analysis[[prcp_lag_colnum]] + strata(PATIENTID), df_analysis)
       
       # populate matrix
       point_estimates[row_n, 3] <- j
@@ -1133,7 +1147,7 @@ geo_smk_est_lag <- combined_point_est_df %>%
            padding.rgroup = "&nbsp;&nbsp;",
            css.cell = "padding-left: 0.5em; padding-right: .5em;", # cell space
            align = "lcccccc", # column alignment,
-           tfoot="&dagger; PM assigned by county. Adjusted for temperature, accounting for subject. Time-stratified: referent periods matched to events on same day of week within July to October fire season."
+           tfoot="&dagger; Adjusted for CDC temperature, relatively humidity, wind speed, and precipitation. Accounting for subject. Time-stratified: referent periods matched to events on same day of week within July to October fire season."
             ) # end table
   
   print(tab)
@@ -1171,7 +1185,7 @@ geo_smk_lag_plot$upper95 <- as.numeric(geo_smk_lag_plot$upper95)
     geom_errorbar(aes(ymin=lower95, ymax=upper95), width = 0.2) +
     facet_wrap(~outcome, nrow = 3) +
     geom_hline(yintercept = 1, linetype=2) +
-    ggtitle('Association Between PM2.5 from \n Wildfire Smoke on Hospitalizations') +
+    ggtitle('Association Between PM2.5 from Wildfire Smoke on Hospitalizations') +
     ylab('Odds Ratio for 10µg/m^3 Increase in PM2.5') +
     #ylim(0.5, 1.5) +
     xlab('Lagged days of geo smoke PM2.5') +
@@ -1350,7 +1364,7 @@ combined_point_est_df$upper95 <- as.numeric(combined_point_est_df$upper95)
     geom_errorbar(aes(ymin=lower95, ymax=upper95), width = 0.2) +
     facet_wrap(~outcome, nrow = 3) +
     geom_hline(yintercept = 1, linetype=2) +
-    ggtitle('County-Level Time-Series: \n Association Between PM2.5 from \n Wildfire Smoke on Hospitalizations') +
+    ggtitle('County-Level Time-Series: Association Between PM2.5 from \n Wildfire Smoke on Hospitalizations') +
     ylab('Risk Ratio for 10µg/m^3 Increase in PM2.5') +
     xlab('Time-Stratified Within July to October Fire Season') +
     scale_colour_discrete(name= "Smoke Method") +
