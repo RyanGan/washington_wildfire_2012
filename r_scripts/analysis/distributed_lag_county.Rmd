@@ -10,7 +10,7 @@ output: html_document
 
 Trying out distributed lag models using the 'dlnm' package. Loading libraries.
 
-```{r libraries used}
+```{r libraries used, echo = F, message = F}
 
 library(tidyverse) # data wrangle package
 library(dlnm) # distributed lag models
@@ -22,9 +22,9 @@ library(splines) # spline library
 
 Importing county-level time-series data.
 
-```{r county time series import}
+```{r county time series import, echo = F, message = F}
 # file path
-file_path <- paste0("./analysis/analysis_data/wa_2012_county_time_series.csv")
+file_path <- paste0("./data/health_data/wa_2012_county_time_series.csv")
 
 # read file
 wash_ts_df <- read_csv(file_path)
@@ -60,13 +60,17 @@ wash_jul_oct_ts_df <- wash_ts_df %>%
   select(1:2, 31:33, 36, 34:35, 38:44, 28:29, 30, 55, 58, 
          65, 64, 63) # subset and order variables used in analysis
 
-
 ```
 
+## Visualizing Time-Series Data
 
-## Visualizing Time-Series data
+First step is to visualize how both the health outcomes and our smoke concentrations vary over time.
 
-```{r plot of events over time}
+### Health Outcomes
+
+First plot contains a small-multiples plot of health outcomes of interest that aggregates all county-specific time-series for the entire state. There is no apparent pattern over the July 1st to October 31st timeseries for CVD outcomes. It's generally hard to observe these patterns in some of the sparsley populationed counties where most smoke occured, so I like to aggregate for the state to get an idea of the background counts.
+
+```{r plot of events over time, echo = F, message = F, results="asis"}
 
 # wrangle time-series dataframe to create small multiples of health outcomes
 outcome_plot_df <- wash_ts_df %>% filter(county != "Unknown") %>% # remove unknown county
@@ -77,31 +81,67 @@ wa_state_aggregate <- outcome_plot_df %>% select(-county) %>%
   summarise_each(funs(sum(., na.rm = T))) %>% 
   gather(key = outcome, value = n, -date)
 
-summary(wa_state_aggregate)
+#summary(wa_state_aggregate)
 
 ggplot(wa_state_aggregate, aes(x = date, y = n)) +
   geom_point() +
   facet_wrap(~outcome, scales = "free")
   
 # check asthma count as a function of pm2.5
-ggplot(wash_jul_oct_ts_df, aes(x = geo_smk_pm_unit10, y = resp_n_wo_miss)) +
-  geom_point() +
-  facet_wrap(~county)
+# ggplot(wash_jul_oct_ts_df, aes(x = geo_smk_pm_unit10, y = resp_n_wo_miss)) +
+#   geom_point() +
+#   facet_wrap(~county)
+```
 
+### County Smoke Concentrations Over Time
+
+Most counties in the state are not impacted by smoke. However, some of the central counties do have the expected peak of high smoke concentrations around mid September.
+
+```{r }
 # check time series of smoke in each county
 ggplot(wash_jul_oct_ts_df, aes(x = date, y = geo_smk_pm_unit10)) +
   geom_point() +
   facet_wrap(~county)
+```
+
+### Asthma and Smoke Time-Series Analysis
+
+Counts of asthma claims tend to tick up a bit in the Fall, right around the state was affected by smoke. First step is to account for the temporal trends in asthma.
+
+Plotting the asthma counts for the overall state and then each county for the July 1st to October 31st 2012 time series.
+
+```{r study period asthma counts by county, message=F, echo=F, results="asis"}
+# aggregated counts limited to July 1 to Oct 31st 2012
+wa_state_aggregate_jul_oct <- wa_state_aggregate %>% 
+  filter(date >= "2012-07-01" & date <= "2012-10-31") %>% 
+  filter(outcome == "asthma_n")
+
+ggplot(wa_state_aggregate_jul_oct, aes(x = date, y = n)) +
+  geom_point() +
+  ggtitle("asthma counts for the 2012 fire season")
+
+# counties small multiple plot of asthma count
+ggplot(wash_jul_oct_ts_df, aes(x = date, y = asthma_n_wo_miss)) +
+  geom_point() +
+  facet_wrap(~county) +
+  ggtitle("asthma counts for the 2012 fire season by county")
+
+ 
 
 ```
+
+It looks like in some of the bigger counties, asthma counts begin to increase in mid August. In King county (where Seattle is), the trend may even suggest that the peak is mid September (around the same time as the fire), and then beings to decrease. King county wasn't really affected by smoke, so it would be safe to say this is shape likely represents the background trend in asthma. It is hard or impossible to see trends in the more sparsely populated counties. Maybe this would be a good place to try and use empirical Bayes estimation? I should ask Ander.
 
 ```{r basic time series}
 
 # using asthma as an example
-mixed_mod <- tidy(glmer(asthma_n_wo_miss ~ geo_smk_pm_unit10 + wrf_temp + (1|county), 
-                        wash_jul_oct_ts_df, family = "poisson"))
+mixed_mod <- tidy(glmer(asthma_n_wo_miss ~ geo_smk_pm_unit10 + wrf_temp + 
+                        (1|county), wash_jul_oct_ts_df, family = "poisson"))
 
 mixed_mod
+
+summary(glmer(asthma_n_wo_miss ~ geo_smk_pm_unit10 + wrf_temp + (1|county), 
+                        wash_jul_oct_ts_df, family = "poisson"))
 
 ```
 
