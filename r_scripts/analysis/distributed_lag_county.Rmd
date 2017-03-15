@@ -263,6 +263,33 @@ This meta-analysis approach yields very similar results where there is an 11% in
 
 I will now fit a natural spline using the 'splines' package to see if it improves the model. There are a couple ways to do it, but 
 
+```{r asthma association with splines}
+# using aggregated asthma count dataset
+# define the function of the spline for the asthma trend for the entrie state
+spl <- ns(asthma_counts$date, df = 3)
+
+# model n asthma events with a spline with 7 df (knotches)
+model1 <- glm(n ~ spl, asthma_counts, family="quasipoisson") 
+summary(model1)
+
+pred1 <- predict(model1, type="response")
+
+plot(asthma_counts$date, asthma_counts$n,
+     ylim=c(0, 30),pch=19,cex=0.2,col=grey(0.1),
+     main="Flexible cubic spline model",ylab="Daily Number of Asthma ER/Urgent",
+     xlab="Date")
+lines(asthma_counts$date, pred1, lwd=2)
+
+# plot residuals
+res1 <- residuals(model1,type="response")
+
+plot(asthma_counts$date, res1,ylim=c(-15,15),pch=19,cex=0.4,col=grey(0.6),
+     main="Residuals over time",ylab="Residuals (observed-fitted)",xlab="Date")
+abline(h=0,lty=2,lwd=2)
+
+
+
+```
 
 ## Distributed Lag Models
 
