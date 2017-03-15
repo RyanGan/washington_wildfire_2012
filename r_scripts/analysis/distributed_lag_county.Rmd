@@ -17,7 +17,7 @@ library(dlnm) # distributed lag models
 library(lme4) # random-effects model
 library(broom) # broom for tidy data from stats models
 library(splines) # spline library
-
+library(rmeta) # meta analysis
 ```
 
 Importing county-level time-series data.
@@ -66,7 +66,7 @@ wash_jul_oct_ts_df <- wash_ts_df %>%
 
 First step is to visualize how both the health outcomes and our smoke concentrations vary over time.
 
-### Health Outcomes
+### Health Outcomes for the Full Year of 2012
 
 First plot contains a small-multiples plot of health outcomes of interest that aggregates all county-specific time-series for the entire state. There is no apparent pattern over the July 1st to October 31st timeseries for CVD outcomes. It's generally hard to observe these patterns in some of the sparsley populationed counties where most smoke occured, so I like to aggregate for the state to get an idea of the background counts.
 
@@ -87,11 +87,34 @@ ggplot(wa_state_aggregate, aes(x = date, y = n)) +
   geom_point() +
   facet_wrap(~outcome, scales = "free")
   
-# check asthma count as a function of pm2.5
-# ggplot(wash_jul_oct_ts_df, aes(x = geo_smk_pm_unit10, y = resp_n_wo_miss)) +
-#   geom_point() +
-#   facet_wrap(~county)
 ```
+
+### Health Outcome Time Series from July 1st to October 31st 2012
+
+Plot of the time trends in outcomes for just the study period of interest.
+
+```{r plot of events jul to oct, echo = F, message = F, results="asis"}
+
+# wrangle time-series dataframe to create small multiples of health outcomes
+outcome_plot_df <- wash_ts_df %>% filter(county != "Unknown") %>% # remove unknown county
+  select(1:8, 10:16) # select columns of health outcomes
+
+wa_state_aggregate_jul_oct <- outcome_plot_df %>% select(-county) %>% 
+  group_by(date) %>% 
+  summarise_each(funs(sum(., na.rm = T))) %>% 
+  gather(key = outcome, value = n, -date) %>% 
+  filter(date >= "2012-07-01" & date <= "2012-10-31")
+
+#summary(wa_state_aggregate)
+
+ggplot(wa_state_aggregate_jul_oct, aes(x = date, y = n)) +
+  geom_point() +
+  facet_wrap(~outcome, scales = "free")
+
+```  
+
+It appears that there may be some temporal trends with some of the respiratory conditions. Asthma is a good example, where the number in the state is around 10 in July/August, but creeps up to as high as 30 in mid-September and early-October. Could part of that increase be due to wildfire smoke or is it part of a natural trend?
+
 
 ### County Smoke Concentrations Over Time
 
@@ -103,6 +126,7 @@ ggplot(wash_jul_oct_ts_df, aes(x = date, y = geo_smk_pm_unit10)) +
   geom_point() +
   facet_wrap(~county)
 ```
+
 
 ### Asthma and Smoke Time-Series Analysis
 
@@ -118,7 +142,7 @@ wa_state_aggregate_jul_oct <- wa_state_aggregate %>%
 
 ggplot(wa_state_aggregate_jul_oct, aes(x = date, y = n)) +
   geom_point() +
-  ggtitle("asthma counts for the 2012 fire season")
+  ggtitle("washington asthma counts for the 2012 fire season")
 
 # counties small multiple plot of asthma count
 ggplot(wash_jul_oct_ts_df, aes(x = date, y = asthma_n_wo_miss)) +
@@ -126,26 +150,123 @@ ggplot(wash_jul_oct_ts_df, aes(x = date, y = asthma_n_wo_miss)) +
   facet_wrap(~county) +
   ggtitle("asthma counts for the 2012 fire season by county")
 
- 
-
 ```
 
 It looks like in some of the bigger counties, asthma counts begin to increase in mid August. In King county (where Seattle is), the trend may even suggest that the peak is mid September (around the same time as the fire), and then beings to decrease. King county wasn't really affected by smoke, so it would be safe to say this is shape likely represents the background trend in asthma. It is hard or impossible to see trends in the more sparsely populated counties. Maybe this would be a good place to try and use empirical Bayes estimation? I should ask Ander.
 
-```{r basic time series}
+There is evidence of overdispersion in each county. General Poisson regression may not be appropriate. 
 
-# using asthma as an example
-mixed_mod <- tidy(glmer(asthma_n_wo_miss ~ geo_smk_pm_unit10 + wrf_temp + 
-                        (1|county), wash_jul_oct_ts_df, family = "poisson"))
+Another issue is how to deal with any potential variation in asthma counts by county. Off the top of my head, it can either be ajusted for as a fixed effect, treated as a random effect, run each counties as seperate models and pool results in a meta-analysis. I'd also like to try an empirical Bayes approach.
 
-mixed_mod
+### GLM Poisson without Natrual Spline
 
-summary(glmer(asthma_n_wo_miss ~ geo_smk_pm_unit10 + wrf_temp + (1|county), 
-                        wash_jul_oct_ts_df, family = "poisson"))
+Exploring very basic models.
+
+```{r basic glm regression}
+# crude model with Poisson distribution
+pois_mod <- glm(asthma_n_wo_miss ~ geo_smk_pm_unit10, wash_jul_oct_ts_df, 
+            family="poisson")
+# print mod
+tidy(pois_mod)
+
+# dispersion parameter for a poisson regression is assumed to be 1
+summary(pois_mod)$dispersion
+
+# crud model with Quasi-Poisson distribution for overdispersion
+quasipois_mod <- glm(asthma_n_wo_miss ~ geo_smk_pm_unit10, wash_jul_oct_ts_df, 
+            family="quasipoisson")
+# print mod
+tidy(quasipois_mod)
+# dispersion parameter for quasipoisson
+summary(quasipois_mod)$dispersion
+
+# dispersion parameter for quasipoisson is >1, suggesting overdispersion
+
+# beta estimate is not different, but standard error is higher in quasipoisson
+```
+
+Based on just these results, it's best to use the quasipoisson distribution to account for zero-inflated values. Beta estimate doesn't change much, but standard error is different enough where it could lead to different conclusions of just Poisson was used.
+
+All subsequent models will use quasipoisson family. Next model adjusts for temperature and county
+
+```{r glm adjusting for temperature}
+
+# adjusted for temp
+quasipois_mod <- glm(asthma_n_wo_miss ~ geo_smk_pm_unit10 + wrf_temp, 
+                     wash_jul_oct_ts_df, family="quasipoisson")
+# print mod
+tidy(quasipois_mod)
+# dispersion parameter
+summary(quasipois_mod)$dispersion
+# still overdispersed adjusting for temp
+
+# adjusting for county as a fixed effect
+quasipois_mod <- glm(asthma_n_wo_miss ~ geo_smk_pm_unit10 + wrf_temp + 
+                          county, wash_jul_oct_ts_df, family="quasipoisson")
+# print mod
+tidy(quasipois_mod) 
+# dispersion parameter
+summary(quasipois_mod)$dispersion
+# when accounting for county, dispersion is actually pretty close to 1
+# suggests it may be okay to use a standard poisson distributions as
+# long as county is accounted for
 
 ```
 
-General interpretation would be for a 1 ug/m^3 increase in smoke PM2.5, astham events increase by 1%.
+Summary from above models is that once county is accounted for, a 10 ug/m^3 increase in smoke PM2.5 is associated with a ~11% increase in asthma hospitalizations for ED or urgent care. Also, when county is accounted for, the dispersion parameter is approximaly 1. This suggests that it may be okay to use a Poisson distribution.
+
+I'm going to try a random effect model with a Poisson distribution, as quasipoisson family does not exist for mixed model package.
+
+```{r time series with a mixed model}
+
+# asthma model where county is a random effect instead of fixed
+mixed_mod <- glmer(asthma_n_wo_miss ~ geo_smk_pm_unit10 + wrf_temp + 
+                  (1|county), wash_jul_oct_ts_df, family = "poisson")
+# full output
+summary(mixed_mod)
+
+# reduced output
+tidy(mixed_mod)
+
+```
+
+These results are almost identical to the model where county is treated as a fixed effect. Increases in a 10 ug/m^3 of wildfire smoke PM2.5 is associated with an ~11% increase in asthma hospitalizations.
+
+### Pooled County-Specific Time Series 
+
+This approch runs a time series for each county, then pools the results in a meta-analysis. I expect this will yield very similar results to the above results.
+
+
+```{r meta of county time series}
+
+county_mods <- wash_jul_oct_ts_df %>% 
+  group_by(county) %>% # group by county
+  do(geo_smk_beta = glm(asthma_n_wo_miss ~ geo_smk_pm_unit10 + wrf_temp, 
+                        data = ., family="quasipoisson")) 
+  
+
+county_betas <- tidy(county_mods, geo_smk_beta) %>% 
+  filter(term == "geo_smk_pm_unit10")
+
+# meta analysis results for asthma and smoke
+meta_results <- meta.summaries(county_betas$estimate, county_betas$std.error, 
+                               method = "fixed")
+
+summary(meta_results)
+meta_results
+
+```
+
+This meta-analysis approach yields very similar results where there is an 11% increase in asthma hospitalizations associated with a 10 ug/m^3 increase in wildfire smoke PM2.5.
+
+### GLM Poisson with Natrual Spline
+
+I will now fit a natural spline using the 'splines' package to see if it improves the model. There are a couple ways to do it, but 
+
+
+## Distributed Lag Models
+
+General interpretation would be for a 1 ug/m^3 increase in smoke PM2.5, asthma events increase by 1%.
 
 ```{r simple dlm}
 
