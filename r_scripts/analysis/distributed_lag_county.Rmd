@@ -18,6 +18,7 @@ library(lme4) # random-effects model
 library(broom) # broom for tidy data from stats models
 library(splines) # spline library
 library(rmeta) # meta analysis
+library(mvmeta) # multivariate meta analysis for pooling region-specific dlnm
 ```
 
 Importing county-level time-series data.
@@ -136,11 +137,11 @@ Plotting the asthma counts for the overall state and then each county for the Ju
 
 ```{r study period asthma counts by county, message=F, echo=F, results="asis"}
 # aggregated counts limited to July 1 to Oct 31st 2012
-wa_state_aggregate_jul_oct <- wa_state_aggregate %>% 
+asthma_state_aggregate_jul_oct <- wa_state_aggregate %>% 
   filter(date >= "2012-07-01" & date <= "2012-10-31") %>% 
   filter(outcome == "asthma_n")
 
-ggplot(wa_state_aggregate_jul_oct, aes(x = date, y = n)) +
+ggplot(asthma_state_aggregate_jul_oct, aes(x = date, y = n)) +
   geom_point() +
   ggtitle("washington asthma counts for the 2012 fire season")
 
@@ -264,32 +265,71 @@ This meta-analysis approach yields very similar results where there is an 11% in
 I will now fit a natural spline using the 'splines' package to see if it improves the model. There are a couple ways to do it, but 
 
 ```{r asthma association with splines}
-# using aggregated asthma count dataset
+# aggregate outcomes for the entire state and average/median smoke estimates
+outcomes_df <- wash_jul_oct_ts_df %>% 
+  select(date, contains("wo_miss")) %>% 
+  group_by(date) %>% 
+  summarise_each(funs(sum(.)))
+
+pm_df <- wash_jul_oct_ts_df %>% 
+  select(date, wrf_temp, contains("pm")) %>% 
+  group_by(date) %>% 
+  summarise_each(funs(mean, median))
+
+wash_outcome_counts_pm <- outcomes_df %>% 
+  full_join(pm_df, by = "date") %>% 
+  mutate(day = weekdays(date),
+    season = ifelse(date >= "2012-06-22" &  date <= "2012-09-22", "summer",
+      ifelse(date >= "2012-09-23" & date <= "2012-12-21", "fall", "other")))
+
+summary(wash_outcome_counts_pm)
+
 # define the function of the spline for the asthma trend for the entrie state
-spl <- ns(asthma_counts$date, df = 3)
+asthma_spl <- ns(wash_outcome_counts_pm$date, df = 3)
+# general question. How does the spline know the trend is for asthma and not 
+# other outcomes? very curious... I will need to look in to this
 
 # model n asthma events with a spline with 7 df (knotches)
-model1 <- glm(n ~ spl, asthma_counts, family="quasipoisson") 
-summary(model1)
+asthma_mod <- glm(asthma_n_wo_miss ~ asthma_spl, wash_outcome_counts_pm, 
+              family="poisson") 
 
-pred1 <- predict(model1, type="response")
+# check spline fit to asthma
+summary(asthma_mod)
 
-plot(asthma_counts$date, asthma_counts$n,
-     ylim=c(0, 30),pch=19,cex=0.2,col=grey(0.1),
-     main="Flexible cubic spline model",ylab="Daily Number of Asthma ER/Urgent",
-     xlab="Date")
-lines(asthma_counts$date, pred1, lwd=2)
+# join predicted number of events to a new df for plotting
+asthma_pred_df <- wash_outcome_counts_pm %>% 
+  select(date, asthma_n_wo_miss) %>% 
+  mutate(expected_n = predict(asthma_mod, type="response"),
+         res = residuals(asthma_mod, type="response"))
+
+# plot predicted events over outcomes
+ggplot(asthma_pred_df, aes(x = date, y = asthma_n_wo_miss)) +
+  geom_point() +
+  stat_smooth(aes(y = expected_n), se = F, method = "loess") +
+  theme_bw()
 
 # plot residuals
-res1 <- residuals(model1,type="response")
+ggplot(asthma_pred_df, aes(x = date, y = res)) +
+  geom_point() +
+  geom_hline(yintercept = 0, colour = "blue") +
+  theme_bw()
 
-plot(asthma_counts$date, res1,ylim=c(-15,15),pch=19,cex=0.4,col=grey(0.6),
-     main="Residuals over time",ylab="Residuals (observed-fitted)",xlab="Date")
-abline(h=0,lty=2,lwd=2)
 
+# run the regression models with the spline
+# models for association between smoke pm and daily asthma count 
+# unadjusted model
+asthma_mod_unadj <- glm(asthma_n_wo_miss ~ geo_smk_pm_unit10_median + 
+                        wrf_temp_mean + day + season, 
+                        wash_outcome_counts_pm, family="quasipoisson")
+summary(asthma_mod_unadj)
 
+# controlling for seasonality with spline
+asthma_mod_adj <- update(asthma_mod_unadj,.~.+ asthma_spl)
+summary(asthma_mod_adj)
 
 ```
+
+When using a spline, there is no association between increasing smoke exposure and asthma counts. However, I had to aggregate to the state.
 
 ## Distributed Lag Models
 
@@ -298,7 +338,7 @@ General interpretation would be for a 1 ug/m^3 increase in smoke PM2.5, asthma e
 ```{r simple dlm}
 
 cb1.pm <- crossbasis(wash_ts_df$geo_wt_pm, lag = 15, argvars=list(fun="lin"),
-                     arglag=list(fun="poly", degree=5))
+                     arglag=list(fun="poly", degree=3))
 
 summary(cb1.pm)
 
@@ -321,7 +361,9 @@ main="Cumulative association with a 1-unit increase in PM2.5")
 
 ```
 
-May not be appropriate to aggregate for the entrie state. Try a county that had some high smoke vals.
+May not be appropriate to aggregate for the entrie state. Just based on outcome and smoke plots, it's clear that there is heterogenity by county.
+
+Gasparrini and Armstrong published an extension of their original distributed lag model work that is a two-stage approach that can pool the results from each region. Perfect for this study.
 
 ```{r chelan dlm}
 # make df
@@ -330,15 +372,16 @@ chelan_df <- wash_jul_oct_ts_df %>%
 
 summary(chelan_df)
 
-# plot relationship
-ggplot(chelan_df, aes(x = date, y = resp_n_wo_miss)) +
-  geom_point()
+# define arguments and lists for cross-basis definition
 
+# sparse counts of asthma visits. i'll try dlm on all resp and cvd outcomes
 
-# sparse counts of asthma visits. i'll try dlm resp and cvd
-cb1.pm <- crossbasis(chelan_df$geo_smk_pm_unit10, lag = 15, 
-                     argvar=list(fun="lin"), arglag=list(fun="poly", degree=5))
+cb.smk <- crossbasis(chelan_df$geo_smk_pm_unit10, # vector of all smk pm vals in chelan 
+                     lag = 10, # max lag days
+                     argvar=list(fun="lin"), # assuming linear relationship 
+                     arglag=list(fun="poly", degree=3)) # assuming polynomial lag function
 
+?crossbasis
 # wrf temp
 cb1.temp <- crossbasis(chelan_df$wrf_temp, lag = 3, 
                      argvar=list(df=5), arglag=list(fun="strata", breaks=1))
@@ -347,11 +390,11 @@ summary(cb1.pm)
 summary(cb1.temp)
 
 # standard model
-summary(glm(cvd_n_wo_miss ~ geo_smk_pm_unit10 + wrf_temp, 
+summary(glm(asthma_n_wo_miss ~ geo_smk_pm_unit10 + wrf_temp, 
             family = quasipoisson(), chelan_df))
 
 # distributed lag model
-model1 <- glm(cvd_n_wo_miss ~ cb1.pm + cb1.temp, family=quasipoisson(), chelan_df)
+model1 <- glm(asthma_n_wo_miss ~ cb1.pm + cb1.temp + day, family=quasipoisson(), chelan_df)
 
 summary(model1)
 
@@ -396,4 +439,22 @@ main="Cumulative association with a 10-unit increase in PM2.5")
 ```
 
 
+```{r dlm in a mixed moel}
+# random effects model for the whole state
+# sparse counts of asthma visits. i'll try dlm resp and cvd
+cb_smk <- crossbasis(wash_jul_oct_ts_df$geo_smk_pm_unit10, lag = 10, 
+                     argvar=list(fun="lin"), arglag=list(fun="poly", degree=5))
 
+# wrf temp
+cb_temp <- crossbasis(wash_jul_oct_ts_df$wrf_temp, lag = 3, 
+                      argvar=list(df=5), arglag=list(fun="strata", breaks=1))
+
+summary(cb_smk)
+summary(cb_temp)
+
+# distributed lag model
+mixed_mod <- glmer(asthma_n_wo_miss ~ cb_smk + cb_temp + 
+                  (1|county), wash_jul_oct_ts_df, family = "poisson")
+# full output
+summary(mixed_mod)
+```
