@@ -25,7 +25,7 @@ Importing county-level time-series data.
 
 ```{r county time series import, echo = F, message = F}
 # file path
-file_path <- paste0("./data/health_data/wa_2012_county_time_series.csv")
+file_path <- paste0("../../data/health_data/wa_2012_county_time_series.csv")
 
 # read file
 wash_ts_df <- read_csv(file_path)
@@ -365,7 +365,7 @@ May not be appropriate to aggregate for the entrie state. Just based on outcome 
 
 Gasparrini and Armstrong published an extension of their original distributed lag model work that is a two-stage approach that can pool the results from each region. Perfect for this study.
 
-```{r chelan dlm}
+```{r chelan dlm, eval = F}
 # make df
 chelan_df <- wash_jul_oct_ts_df %>% 
   filter(county == "Chelan")
@@ -439,7 +439,7 @@ main="Cumulative association with a 10-unit increase in PM2.5")
 ```
 
 
-```{r dlm in a mixed moel}
+```{r dlm in a mixed model, eval = F}
 # random effects model for the whole state
 # sparse counts of asthma visits. i'll try dlm resp and cvd
 cb_smk <- crossbasis(wash_jul_oct_ts_df$geo_smk_pm_unit10, lag = 10, 
