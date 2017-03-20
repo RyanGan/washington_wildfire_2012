@@ -117,13 +117,18 @@ ggplot(wa_state_aggregate_jul_oct, aes(x = date, y = n)) +
 It appears that there may be some temporal trends with some of the respiratory conditions. Asthma is a good example, where the number in the state is around 10 in July/August, but creeps up to as high as 30 in mid-September and early-October. Could part of that increase be due to wildfire smoke or is it part of a natural trend?
 
 
-### County Smoke Concentrations Over Time
+### County Smoke Concentrations and Temperature Over Time
 
 Most counties in the state are not impacted by smoke. However, some of the central counties do have the expected peak of high smoke concentrations around mid September.
 
 ```{r }
 # check time series of smoke in each county
 ggplot(wash_jul_oct_ts_df, aes(x = date, y = geo_smk_pm_unit10)) +
+  geom_point() +
+  facet_wrap(~county)
+
+# temp
+ggplot(wash_jul_oct_ts_df, aes(x = date, y = wrf_temp)) +
   geom_point() +
   facet_wrap(~county)
 ```
@@ -415,10 +420,10 @@ arglag <- list(fun="ns",df=4)
 # - natural cubic spline for lag, with DF at equally-spaced log vals
 # warning for prediction beyond boundaries suppressed 
 suppressWarnings(
-cb <- crossbasis(county_list_df[[county_name]]$geo_smk_pm_unit10,
+cb_chelan <- crossbasis(county_list_df[[county_name]]$geo_smk_pm_unit10,
                  lag=10, argvar=argvar, arglag=arglag)
 )
-summary(cb)
+summary(cb_chelan)
 
 
 # run the model
@@ -449,8 +454,7 @@ main="Lag-response curve of incremental cumulative effects")
 
 ```{r first stage county prediction}
 #  these first two commands aren't necissary since I'm assuming linear for now
-bound <- c(max(smk_range[,1]), max(smk_range[,2]))
-varknots <- bound[1] + diff(bound)/3*(1:2) # I actually don't need this
+
 # assuming linear relationship between smoke and outcomes
 argvar <- list(fun="lin")
 # fitting a natural spline for lag with 5 knots?
@@ -464,12 +468,12 @@ lag <- 10
 
 # overall cumulative summaries
 # need 4 columns for the 4 degrees of freedom for the spline
-yall <- matrix(NA, length(county_list_df), 4, 
+asthma_all <- matrix(NA, length(county_list_df), 4, 
                dimnames=list(counties,paste("b",seq(4),sep="")))
 
 # (CO)VARIANCE MATRICES
-Sall <- vector("list",length(county_list_df))
-names(Sall) <- counties
+asthma_cov_all <- vector("list",length(county_list_df))
+names(asthma_cov_all) <- counties
 
 # Q-AIC
 qaic <- 0
@@ -482,26 +486,28 @@ for(i in seq(county_list_df)) {
 
   # LOAD
   sub <- county_list_df[[i]]
-  
+  lag
+  argvar
+  arglag
   # DEFINE THE CROSS-BASES
   suppressWarnings({
-    cb <- crossbasis(sub$geo_smk_pm_unit10,
+  asthma_cb <- crossbasis(sub$geo_smk_pm_unit10,
                      lag=lag, argvar=argvar, arglag=arglag)
 
   })
 
   # RUN THE FIRST-STAGE MODELS
-  model <- glm(asthma_n_wo_miss ~ cb , #+ ns(date, df=3),
+  model <- glm(asthma_n_wo_miss ~ asthma_cb , #+ ns(date, df=3),
     family = "quasipoisson", sub)
-
-  # adding in a smoothed spline causes some models not to converge
+  
+  summary(model)
   
 # ----
   # REDUCTION TO SUMMARY ASSOCIATIONS
 
   # prediction summary for smoke 10 ug/m^3
   suppressWarnings({
-    crall <- crossreduce(cb, model, type = "var", value = 1)
+    asthma_cr_all <- crossreduce(asthma_cb, model, type = "var", value = 1)
 
   })
 
@@ -509,8 +515,8 @@ for(i in seq(county_list_df)) {
   # STORE THE RESULTS
 
   # OVERALL CUMULATIVE SUMMARY FOR THE MAIN MODEL
-  yall[i,] <- coef(crall)
-  Sall[[i]] <- vcov(crall)
+  asthma_all[i,] <- coef(asthma_cr_all)
+  asthma_cov_all[[i]] <- vcov(asthma_cr_all)
 
   # Q-AIC
   qaic[i] <- fqaic(model)
@@ -542,44 +548,213 @@ method <- "reml"
 #   INSPECT THE OPTIMIZATION SEARCH
 
 # OVERALL CUMULATIVE SUMMARY FOR THE MAIN MODEL
-mvall <- mvmeta(yall~1,Sall,method=method)
-summary(mvall)
+mv_asthma_all <- mvmeta(asthma_all~1,asthma_cov_all,method=method)
+summary(mv_asthma_all)
 
 ####################################################################
 # CREATE BASES FOR PREDICTION
-
+asthma_cr_all$RRlow
 # BASES OF TEMPERATURE AND LAG USED TO PREDICT, EQUAL TO THAT USED FOR ESTIMATION
 # COMPUTED USING THE ATTRIBUTES OF THE CROSS-BASIS USED IN ESTIMATION
-xlag <- 0:50/5
-blag <- do.call("onebasis",c(list(x=xlag),attr(cb,"arglag")))
-blag
+xlag <- 0:110/10
+blag <- do.call("onebasis",c(list(x=xlag),attr(asthma_cb,"arglag")))
+
 ####################################################################
 # REGION-SPECIFIC FIRST-STAGE SUMMARIES
 
-county_all <- apply(yall,1,function(x) exp(blag%*%x))
+reg_county_all <- apply(asthma_all,1 , function(x) exp(blag%*%x))
 
-pred1.pm <- crosspred(cb1.pm, model1, at=0:20, bylag=0.2, cumul=TRUE)
 
 ####################################################################
 # PREDICTION FOR A GRID OF TEMPERATURE AND LAG VALUES
 
 # PREDICTOR-SPECIFIC SUMMARIES FOR 10 ug/m^3 of smoke
-cp_smk10 <- crosspred(blag, coef=coef(mvall),vcov=vcov(mvall),
-  model.link="log", at = 0:50/5, bylag = 0.2)
+cp_smk10 <- crosspred(blag, coef=coef(mv_asthma_all),
+                      vcov=vcov(mv_asthma_all),
+                      model.link="log", at = 0:110/10)
 
-cp_smk10$predvar
+# summary stats
+cp_smk10$allRRfit
+cp_smk10$allRRlow
+cp_smk10$matRRfit
 
-# START HERE ----
 # plot
-plot(cp_smk10, type="n", ylab="RR",ylim=c(0.8,1.4),xlab="Lag")
-matplot(xlag, cp_smk10, type="l",col=grey(0.5),lty=2,add=T)
-
+plot.crosspred(cp_smk10, type="n", ylim=c(.5, 2.0), ylab="RR", xlab="Lag")
+matplot(xlag, reg_county_all, type="l", col=grey(0.5),lty=2,add=T)
 abline(h=1)
-lines(cphot,col=2,lwd=2)
+lines(cp_smk10,col=2,lwd=2)
 legend ("top",c("Pooled (with 95%CI)","First-stage region-specific"),
   lty=c(1,2),lwd=1.5,col=c(2,grey(0.7)),bty="n",inset=0.1,cex=0.8)
 mtext(text=paste("Predictor-specific summary for temperature = ",22,
   "C",sep=""),cex=1)
 
+# this seems to work.
 ```
 
+I think I figured out the DLM without non-linear relationships. I'm going to run it for all respiratory and all CVD outcomes for the abstract.
+
+### Two-Stage DLM for All Respiratory and CVD Outcomes
+
+```{r resp and cvd two stage analysis }
+# setup ----
+# assuming linear relationship between smoke and outcomes
+argvar <- list(fun="lin")
+# fitting a natural spline for lag with 5 knots?
+arglag <- list(fun="ns", df=4)
+lag <- 10
+
+# build matrix where results will be stored
+#   resp_all- matrix for outcome parameters
+#   resp_cov_all - list of (co)variance matrices
+
+# overall cumulative summaries
+# need 4 columns for the 4 degrees of freedom for the spline
+cvd_all <- resp_all <- matrix(NA, length(county_list_df), 4, 
+  dimnames=list(counties,paste("b",seq(4),sep="")))
+
+# (co)variance matrices
+cvd_cov_all <- resp_cov_all <- vector("list",length(county_list_df))
+names(resp_cov_all) <- counties
+names(cvd_cov_all) <- counties
+
+# Q-AIC
+qaic_resp <- 0
+qaic_cvd <- 0
+
+# loop for each city ----
+
+# warning for predictions out of bounds suppressed
+system.time({
+for(i in seq(county_list_df)) {
+
+  # load county dataframe
+  sub <- county_list_df[[i]]
+
+  # define the cross-basis for smoke ----
+  suppressWarnings({
+  smk_cb <- crossbasis(sub$geo_smk_pm_unit10,
+                     lag=lag, argvar=argvar, arglag=arglag)
+  
+  temp_cb <- crossbasis(sub$wrf_temp, lag = lag, argvar = argvar,
+                        arglag = arglag)
+  
+  })
+
+
+  # run the first stage models
+  resp_model <- glm(resp_n_wo_miss ~ smk_cb + temp_cb, 
+    family = "quasipoisson", sub)
+  
+  cvd_model <- glm(cvd_n_wo_miss ~ smk_cb + temp_cb, 
+    family = "quasipoisson", sub)
+  
+  # reduction to summary results ---
+  # prediction summary for smoke 10 ug/m^3 
+  suppressWarnings({
+    resp_cr_all <- crossreduce(smk_cb, resp_model, type = "var", value = 1)
+    
+    cvd_cr_all <- crossreduce(smk_cb, cvd_model, type = "var", value = 1)
+
+  })
+
+
+  # store results in matrix ---
+
+  # daily lag results
+  resp_all[i,] <- coef(resp_cr_all)
+  resp_cov_all[[i]] <- vcov(resp_cr_all)
+  
+  cvd_all[i,] <- coef(cvd_cr_all)
+  cvd_cov_all[[i]] <- vcov(cvd_cr_all)
+
+  # Q-AIC
+  qaic_resp[i] <- fqaic(resp_model)
+  qaic_cvd[i] <- fqaic(cvd_model)
+}
+})
+
+# GRAND Q-AIC
+sum(qaic_resp)
+sum(qaic_cvd)
+
+# garfield county producing error for cvd; fails to converge
+
+# second stage ----
+# multivariate meta analysis
+
+# reml estimation method
+method <- "reml"
+
+# overall pooled summary for resp and cvd model
+mv_resp_all <- mvmeta(resp_all~1, resp_cov_all, method = method)
+
+# taking out garfiled county as it will affect the convergence of
+# the meta analysis 
+cvd_wo_garfield <- subset(cvd_all, rownames(cvd_all) != "Garfield")
+cvd_cov_all <- cvd_cov_all
+
+#counties_wo_garfield <- counties[c(1:11, 13:39)]
+#counties_wo_garfield
+
+cvd_cov_wo_garfield <- cvd_cov_all[c(1:11, 13:39)]
+
+mv_cvd_all <- mvmeta(cvd_wo_garfield~1, 
+                     cvd_cov_wo_garfield, method = method)
+
+# # meta summaries
+# summary(mv_resp_all)
+# summary(mv_cvd_all)
+
+# create bases for prediction ----
+
+# bases of smoke lag
+xlag <- 0:110/10
+blag <- do.call("onebasis",c(list(x=xlag),attr(smk_cb,"arglag")))
+
+# county-specific first stage summaries
+
+resp_county_all <- apply(resp_all,1, function(x) exp(blag%*%x))
+cvd_count_all <- apply(cvd_wo_garfield, 1, function(x) exp(blag%*%x))
+
+
+# prediction for a grid of lag days
+
+# predictor-specific summaries for 10 ug/m^3 of smoke
+resp_cp_smk10 <- crosspred(blag, coef=coef(mv_resp_all),
+                      vcov=vcov(mv_resp_all),
+                      model.link="log", at = 0:110/10)
+
+
+cvd_cp_smk10 <- crosspred(blag, coef=coef(mv_cvd_all), 
+                          vcov=vcov(mv_cvd_all),
+                          model.link="log", at = 0:110/10)
+
+# # summary stats for resp
+# resp_cp_smk10$allRRfit
+# resp_cp_smk10$allRRlow
+# resp_cp_smk10$allRRhigh
+# # summary stats for cvd
+ # cvd_cp_smk10$allRRfit
+ # cvd_cp_smk10$allRRlow
+ # cvd_cp_smk10$allRRhigh
+
+# plot of all resp
+plot.crosspred(resp_cp_smk10, type="n", ylim=c(.8, 1.2), ylab="RR", xlab="Lag")
+#matplot(xlag, resp_county_all, type="l", col=grey(0.5),lty=2,add=T)
+abline(h=1)
+lines(resp_cp_smk10,col=2,lwd=2)
+legend ("top","Pooled (with 95%CI)",#,"First-stage region-specific"),
+  lty=c(1,2),lwd=1.5,col=c(2,grey(0.7)),bty="n",inset=0.1,cex=0.8)
+mtext(text=paste("10 ug/m^3 increase in GWR Smoke and All Respiratory Hospitalizations"))
+
+
+# plot of cvd
+plot.crosspred(cvd_cp_smk10, type="n", ylim=c(.8, 1.2), ylab="RR", xlab="Lag")
+#matplot(xlag, resp_county_all, type="l", col=grey(0.5),lty=2,add=T)
+abline(h=1)
+lines(cvd_cp_smk10,col=2,lwd=2)
+legend ("top","Pooled (with 95%CI)",#,"First-stage region-specific"),
+  lty=c(1,2),lwd=1.5,col=c(2,grey(0.7)),bty="n",inset=0.1,cex=0.8)
+mtext(text=paste("10 ug/m^3 increase in GWR Smoke and CVD Hospitalizations"))
+
+```
