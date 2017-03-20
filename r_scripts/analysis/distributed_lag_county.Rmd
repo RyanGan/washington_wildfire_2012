@@ -745,13 +745,13 @@ cvd_cp_smk10 <- crosspred(blag, coef=coef(mv_cvd_all),
                           model.link="log", at = 0:110/10)
 
 # # summary stats for resp
-# resp_cp_smk10$allRRfit
-# resp_cp_smk10$allRRlow
-# resp_cp_smk10$allRRhigh
+resp_cp_smk10$allRRfit
+resp_cp_smk10$allRRlow
+resp_cp_smk10$allRRhigh
 # # summary stats for cvd
- # cvd_cp_smk10$allRRfit
- # cvd_cp_smk10$allRRlow
- # cvd_cp_smk10$allRRhigh
+cvd_cp_smk10$allRRfit
+cvd_cp_smk10$allRRlow
+cvd_cp_smk10$allRRhigh
 
 # plot of all resp
 plot.crosspred(resp_cp_smk10, type="n", ylim=c(.8, 1.2), ylab="RR", xlab="Lag")
