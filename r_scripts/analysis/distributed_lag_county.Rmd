@@ -25,7 +25,7 @@ Importing county-level time-series data.
 
 ```{r county time series import, echo = F, message = F}
 # file path
-file_path <- paste0("./data/health_data/wa_2012_county_time_series.csv")
+file_path <- paste0("../../data/health_data/wa_2012_county_time_series.csv")
 
 # read file
 wash_ts_df <- read_csv(file_path)
@@ -371,7 +371,14 @@ May not be appropriate to aggregate for the entrie state. Just based on outcome 
 
 ### Two-Stage Distributed Lag by County and Meta-Analysis
 
+<<<<<<< HEAD
+```{r chelan dlm, eval = F}
+# make df
+chelan_df <- wash_jul_oct_ts_df %>% 
+  filter(county == "Chelan")
+=======
 I've tried a mixed effects model and it doesn't coverge. I will need to do a two-stage model. Gasparrini and Armstrong published an extension of their original distributed lag model work that is a two-stage approach that can pool the results from each region. Perfect for this study.
+>>>>>>> a265e7d3ae524330ac7bcd2a9ac110a5065ebcd5
 
 I'm following the code from Gasparrini's two-stage paper to run distributed lag models for each county and then combine estimates via meta-analysis.
 
@@ -531,6 +538,13 @@ sum(qaic)
 ```
 
 
+<<<<<<< HEAD
+```{r dlm in a mixed model, eval = F}
+# random effects model for the whole state
+# sparse counts of asthma visits. i'll try dlm resp and cvd
+cb_smk <- crossbasis(wash_jul_oct_ts_df$geo_smk_pm_unit10, lag = 10, 
+                     argvar=list(fun="lin"), arglag=list(fun="poly", degree=5))
+=======
 ```{r second stage meta}
 ####################################################################
 # SECOND STAGE
@@ -538,6 +552,7 @@ sum(qaic)
 # - CREATE BASIS VARIABLES USING onebasis, TO BE USED FOR PREDICTION
 # - OBTAIN PREDICTIONS THROUGH crosspred (dlnm)
 ####################################################################
+>>>>>>> a265e7d3ae524330ac7bcd2a9ac110a5065ebcd5
 
 ####################################################################
 # PERFORM MULTIVARIATE META-ANALYSIS
