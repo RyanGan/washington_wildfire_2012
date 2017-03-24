@@ -34,8 +34,8 @@ Note, epidemiological methods that Sheryl and I think can improve our estimation
 # set working directory if you want to run seperate chunks
 # setwd("./r_scripts/analysis")
 
-path <- paste0("../../data/health_data")
-
+#path <- paste0("../../data/health_data")
+path <- paste0("./data/health_data")
 # Infile case-crossover dataframes ---------------------------------------------
 # Dataframes made in 'chars_3month_binary_smoke_may2016 script
 # resp exacerbations
@@ -97,15 +97,16 @@ broken_arm_casecross <- read_csv(paste(path,
 
 
 # read zip pm for counts by zip
+#smoke_path <- paste0("../../data/pm_data/")
+smoke_path <- paste0("./data/pm_data/")
 
-zip_pm <- read_csv("../../data/pm_data/zip_pm_to_merge_with_chars.csv")
+zip_pm <- read_csv(paste0(smoke_path, "zip_pm_to_merge_with_chars.csv"))
 
 # read locations of fires
-fire_loc <- read_csv("../../data/pm_data/washington_fires_locations201209.csv")
-
+fire_loc <- read_csv(paste0(smoke_path, "washington_fires_locations201209.csv"))
 
 # import the zip-level met data files Rish sent
-zip_met <- read_csv("../../data/pm_data/wa_zip_exp_0710_2012_ryan.csv") %>% 
+zip_met <- read_csv(paste0(smoke_path, "wa_zip_exp_0710_2012_ryan.csv")) %>% 
   # define date variable; original character looked like: 01JUL2012
   mutate(date = as.Date(date, "%d%B%Y"))
 
@@ -136,6 +137,7 @@ Figures below are for each smoke PM~2.5~ estimation method. The figures are the 
 # creation of map and identifying zipcodes in ecoregions----
 # import the regional shapefile downloaded from state website
 shp_dir <- paste0('../../data/shape_files/WAECY__Ecology_Regions')
+shp_dir <- paste0('./data/shape_files/WAECY__Ecology_Regions')
 
 eco_region <- readOGR(dsn = shp_dir, layer = 'WAECY__Ecology_Regions')
 # set coord ref system to WGS84 to match projections of ggmap
