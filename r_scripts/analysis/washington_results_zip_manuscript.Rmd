@@ -166,7 +166,8 @@ eco_df <- tidy(eco_region, region = "ECY_REGION")
 
 # creation of eco region map (may change colors)
 eco_region_map <- ggmap(washington_map) + 
-  geom_polygon(data = eco_region, aes(x=long, y=lat, group = group, fill = group), color = "black", alpha = 0.8) +
+  geom_polygon(data = eco_region, aes(x=long, y=lat, group = group, 
+    fill = group), color = "black", alpha = 0.8) +
   scale_fill_manual(name = "Ecology Regions",
                     values = c("#2c7bb6","#abd9e9","#d7191c","#fdae61"), 
                     labels = c("Southwest", "Northwest", "Central", "Eastern"),
@@ -185,7 +186,8 @@ eco_region_map <- ggmap(washington_map) +
 print(eco_region_map)
 
 # import washington zip shapefile ----
-zip_path <- paste0('../../data/shape_files/wash_zip_2012_shapefile')
+#zip_path <- paste0('../../data/shape_files/wash_zip_2012_shapefile')
+zip_path <- paste0('./data/shape_files/wash_zip_2012_shapefile')
 
 wash_zip_map <- readOGR(dsn = zip_path, layer = "wash_zip_2012_shapefile")
 
@@ -263,7 +265,8 @@ gg_title <- title_name[i]
 
 # create plot for method range
 plot_print <- ggplot(df_range, aes(x = date)) +
-  geom_ribbon(aes(ymin = min, ymax = max, group = eco_region, fill=eco_region), alpha = 0.7) +
+  geom_ribbon(aes(ymin = min, ymax = max, group = eco_region, 
+                  fill=eco_region), alpha = 0.7) +
   scale_fill_manual(name = "Washington State Ecology \n Regional Office Jurisdiction",
                     values = c("#d7191c", "#fdae61", "#abd9e9", "#2c7bb6"),
                     labels = c("Central", "Eastern","Northwest", "Southwest"),
@@ -342,27 +345,17 @@ print_map <- ggmap(washington_map) +
   geom_polygon(data = wash_zip_df, 
     aes(x=long, y=lat, group = group, fill = geo_smk10_days), alpha = 0.7) +
   scale_fill_gradient(expression("Number of \nSmoke Days"),
-    low = '#2c7bb6', high = '#d7191c', 
-    guide = guide_legend(title.position = "top", order = 1)) +
+    low = '#2c7bb6', high = '#d7191c') + 
   geom_point(data = fire_loc, aes(x = Longitude, y = Latitude, shape = "Fire Locations"), 
              colour = "black", fill = "red") +
-  scale_shape_manual(name = "", values = 24, 
-                     guide = guide_legend(title.position = "top", order = 2)) +
+  scale_shape_manual(name = "", values = 24) + 
   xlab("Longitude") +
-  ylab("Latitude") # +
-  #ggtitle("Days where geo smoke PM2.5 > 10 for \nzip codes from July 1st to October 31st") + 
-  #theme(axis.text.x=element_blank(),
-        #axis.text.y=element_blank(),
-        #axis.ticks=element_blank(),
-        #axis.title.x=element_blank(),
-        #axis.title.y=element_blank(),
-        #axis.line = element_blank())
+  ylab("Latitude") +
+  # control legend/guide lable order
+  guides(fill = guide_colourbar(title.position = "top", order = 1),
+         shape = guide_legend(title.position = "top", order = 2))
 
 print(print_map)
-
-
-
-# smoke greater than 10 units map
 
 ```
 
