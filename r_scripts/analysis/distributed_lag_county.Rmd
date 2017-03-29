@@ -121,7 +121,7 @@ It appears that there may be some temporal trends with some of the respiratory c
 
 Most counties in the state are not impacted by smoke. However, some of the central counties do have the expected peak of high smoke concentrations around mid September.
 
-```{r }
+```{r exposure series, echo = F, message = F, results="asis"}
 # check time series of smoke in each county
 ggplot(wash_jul_oct_ts_df, aes(x = date, y = geo_smk_pm_unit10)) +
   geom_point() +
@@ -168,7 +168,7 @@ Another issue is how to deal with any potential variation in asthma counts by co
 
 Exploring very basic models.
 
-```{r basic glm regression}
+```{r basic glm regression, echo = F, message = F, results="asis"}
 # crude model with Poisson distribution
 pois_mod <- glm(asthma_n_wo_miss ~ geo_smk_pm_unit10, wash_jul_oct_ts_df, 
             family="poisson")
@@ -195,7 +195,7 @@ Based on just these results, it's best to use the quasipoisson distribution to a
 
 All subsequent models will use quasipoisson family. Next model adjusts for temperature and county
 
-```{r glm adjusting for temperature}
+```{r glm adjusting for temperature, echo = F, message = F, results="asis"}
 
 # adjusted for temp
 quasipois_mod <- glm(asthma_n_wo_miss ~ geo_smk_pm_unit10 + wrf_temp, 
@@ -223,7 +223,7 @@ Summary from above models is that once county is accounted for, a 10 ug/m^3 incr
 
 I'm going to try a random effect model with a Poisson distribution, as quasipoisson family does not exist for mixed model package.
 
-```{r time series with a mixed model}
+```{r time series with a mixed model, echo = F, message = F, results="asis"}
 
 # asthma model where county is a random effect instead of fixed
 mixed_mod <- glmer(asthma_n_wo_miss ~ geo_smk_pm_unit10 + wrf_temp + 
@@ -243,7 +243,7 @@ These results are almost identical to the model where county is treated as a fix
 This approch runs a time series for each county, then pools the results in a meta-analysis. I expect this will yield very similar results to the above results.
 
 
-```{r meta of county time series}
+```{r meta of county time series, echo = F, message = F, results="asis"}
 
 county_mods <- wash_jul_oct_ts_df %>% 
   group_by(county) %>% # group by county
@@ -269,7 +269,7 @@ This meta-analysis approach yields very similar results where there is an 11% in
 
 I will now fit a natural spline using the 'splines' package to see if it improves the model. There are a couple ways to do it, but 
 
-```{r asthma association with splines}
+```{r asthma association with splines, echo = F, message = F, results="asis"}
 # aggregate outcomes for the entire state and average/median smoke estimates
 outcomes_df <- wash_jul_oct_ts_df %>% 
   select(date, contains("wo_miss")) %>% 
@@ -341,7 +341,7 @@ When using a spline, there is no association between increasing smoke exposure a
 
 General interpretation would be for a 1 ug/m^3 increase in smoke PM2.5, asthma events increase by 1%.
 
-```{r simple dlm}
+```{r simple dlm, echo = F, message = F, results="asis"}
 
 cb1.pm <- crossbasis(wash_ts_df$geo_wt_pm, lag = 15, argvars=list(fun="lin"),
                      arglag=list(fun="poly", degree=3))
@@ -371,18 +371,9 @@ May not be appropriate to aggregate for the entrie state. Just based on outcome 
 
 ### Two-Stage Distributed Lag by County and Meta-Analysis
 
-<<<<<<< HEAD
-```{r chelan dlm, eval = F}
-# make df
-chelan_df <- wash_jul_oct_ts_df %>% 
-  filter(county == "Chelan")
-=======
-I've tried a mixed effects model and it doesn't coverge. I will need to do a two-stage model. Gasparrini and Armstrong published an extension of their original distributed lag model work that is a two-stage approach that can pool the results from each region. Perfect for this study.
->>>>>>> a265e7d3ae524330ac7bcd2a9ac110a5065ebcd5
+Following two-stage approach where a DLM is run for each county, then pooled via meta-analysis.
 
-I'm following the code from Gasparrini's two-stage paper to run distributed lag models for each county and then combine estimates via meta-analysis.
-
-```{r two stage prep}
+```{r two stage prep, echo = F, message = F, results="asis"}
 # create county vector
 counties <- as.character(unique(wash_jul_oct_ts_df$county))
 
@@ -412,7 +403,7 @@ fqaic <- function(model) {
 
 I'm going to run a single county model for Chelan county.
 
-```{r chelan dlm linear}
+```{r chelan dlm linear, echo = F, message = F, results="asis"}
 # select county
 county_name <- "Chelan"
 
@@ -434,7 +425,7 @@ summary(cb_chelan)
 
 
 # run the model
-model <- glm(asthma_n_wo_miss ~ cb + ns(date, df=3),
+model <- glm(asthma_n_wo_miss ~ cb_chelan + ns(date, df=3),
   family = "quasipoisson", county_list_df[[county_name]])
 
 summary(model)
@@ -444,7 +435,7 @@ summary(model)
 #   crossreduce for uni-dimensional summaries 
 # (NB: all the estimates are presented by crosspred alone)
 
-pred_smk <- crosspred(cb, model, at = 0:20, bylag = 0.2, cumul = T)
+pred_smk <- crosspred(cb_chelan, model, at = 0:20, bylag = 0.2, cumul = T)
 pred_smk$matRRfit
 
 # plot the lag-response curves for specific and incremental cumulative effects
@@ -459,7 +450,7 @@ main="Lag-response curve of incremental cumulative effects")
 ```
 
 
-```{r first stage county prediction}
+```{r first stage county prediction, echo = F, message = F, results="asis"}
 #  these first two commands aren't necissary since I'm assuming linear for now
 
 # assuming linear relationship between smoke and outcomes
@@ -537,22 +528,10 @@ sum(qaic)
 
 ```
 
+Asthma outcome.
 
-<<<<<<< HEAD
-```{r dlm in a mixed model, eval = F}
-# random effects model for the whole state
-# sparse counts of asthma visits. i'll try dlm resp and cvd
-cb_smk <- crossbasis(wash_jul_oct_ts_df$geo_smk_pm_unit10, lag = 10, 
-                     argvar=list(fun="lin"), arglag=list(fun="poly", degree=5))
-=======
-```{r second stage meta}
-####################################################################
-# SECOND STAGE
-# - RUN THE MULTIVARIATE META-ANALYTICAL MODELS WITH mvmeta
-# - CREATE BASIS VARIABLES USING onebasis, TO BE USED FOR PREDICTION
-# - OBTAIN PREDICTIONS THROUGH crosspred (dlnm)
-####################################################################
->>>>>>> a265e7d3ae524330ac7bcd2a9ac110a5065ebcd5
+```{r dlm in a mixed model, echo = F, message = F, results="asis"}
+
 
 ####################################################################
 # PERFORM MULTIVARIATE META-ANALYSIS
