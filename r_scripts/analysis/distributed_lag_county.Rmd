@@ -25,7 +25,7 @@ Importing county-level time-series data.
 
 ```{r county time series import, echo = F, message = F}
 # file path
-file_path <- paste0("./data/health_data/wa_2012_county_time_series.csv")
+file_path <- paste0("../../data/health_data/wa_2012_county_time_series.csv")
 
 # read file
 wash_ts_df <- read_csv(file_path)
@@ -347,7 +347,7 @@ cb1.pm <- crossbasis(wash_ts_df$geo_wt_pm, lag = 15, argvars=list(fun="lin"),
                      arglag=list(fun="poly", degree=3))
 
 summary(cb1.pm)
-crossbasis
+
 
 model1 <- glm(asthma_n ~ cb1.pm ,
               family=quasipoisson(), wash_ts_df)
