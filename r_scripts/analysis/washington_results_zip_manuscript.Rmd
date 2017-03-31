@@ -302,7 +302,9 @@ map_timeseries <- ggdraw() +
 
 
 plot(map_timeseries)
-
+# save 6 inch by 4 inch
+ggsave("./fig1.pdf", plot = map_timeseries, 
+       width = 12, height = 8, units = "in")
 
 ```
 
@@ -356,6 +358,9 @@ print_map <- ggmap(washington_map) +
          shape = guide_legend(title.position = "top", order = 2))
 
 print(print_map)
+
+ggsave("./fig2.pdf", plot = print_map, 
+       width = 12, height = 8, units = "in")
 
 ```
 
@@ -768,6 +773,9 @@ combined_point_est_df <- combined_point_est_df %>%
     #legend.text = element_text(size = 8))
 
   print(print_plot)
+  # save figure
+  ggsave("./fig3.pdf", plot = print_plot, 
+       width = 12, height = 8, units = "in")
   
 # figures for research day
   # plot of only respiratory outcomes
@@ -1131,7 +1139,11 @@ wrf_geo_age_plot$upper95 <- as.numeric(wrf_geo_age_plot$upper95)
 
 
   print(print_plot)
-
+  # save figure
+  ggsave("./fig5.pdf", plot = print_plot, 
+       width = 12, height = 8, units = "in")
+  
+  
 ```
 
 
@@ -1373,6 +1385,9 @@ wrf_geo_sex_plot$upper95 <- as.numeric(wrf_geo_sex_plot$upper95)
 
 
   print(print_plot)
+  # save figure
+  ggsave("./fig6.pdf", plot = print_plot, 
+       width = 12, height = 8, units = "in")
 
 
 ```
@@ -1616,6 +1631,10 @@ wrf_geo_lag_plot$upper95 <- as.numeric(wrf_geo_lag_plot$upper95)
     #legend.text = element_text(size = 8))
   
   print(print_plot)
+  
+  # save figure
+  ggsave("./fig4.pdf", plot = print_plot, 
+       width = 12, height = 8, units = "in")
 
 ```
 
