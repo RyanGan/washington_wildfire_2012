@@ -32,6 +32,23 @@ wash_ts_df <- read_csv(file_path)
 
 summary(wash_ts_df)
 
+# read in county estimates for offset
+pop_path <- paste0("./data/health_data/wa_census_pop_est_county.csv")
+pop_est <- read_csv(pop_path) %>% 
+  # seperate county from state
+  separate(GEO.display.label, c("county", "state"), sep = ",") %>% 
+  # remove the word 'county' from the county string (mind the space)
+  mutate(county = gsub(county, pattern = " County", replacement = "")) %>% 
+  # rename variables
+  rename(fips = GEO.id2, pop_2010 = respop72010, pop_2011 = respop72011,
+         pop_2012 = respop72012, pop_2013 = respop72013, pop_2014 = respop72014,
+         pop_2015 = respop72015, pop_2016 = respop72016) %>% 
+  # limit to certain variables
+  select(state, county, fips, pop_2010:pop_2016)
+
+# only need 2012 population estimate as an offset
+county_pop_2012 <- pop_est %>% select(county, pop_2012)
+
 # analysis dataframe
 wash_jul_oct_ts_df <- wash_ts_df %>% 
   # restricting points
@@ -59,7 +76,9 @@ wash_jul_oct_ts_df <- wash_ts_df %>%
   # rescale pm variables to 10 units
   mutate_each(funs(unit10 = ./10), wrf_pm:krig_smk_pm) %>% 
   select(1:2, 31:33, 36, 34:35, 38:44, 28:29, 30, 55, 58, 
-         65, 64, 63) # subset and order variables used in analysis
+         65, 64, 63) %>% # subset and order variables used in analysis
+  # join county population estimates for offset
+  right_join(county_pop_2012, by = "county")
 
 ```
 
@@ -133,7 +152,6 @@ ggplot(wash_jul_oct_ts_df, aes(x = date, y = wrf_temp)) +
   facet_wrap(~county)
 ```
 
-
 ### Asthma and Smoke Time-Series Analysis
 
 Counts of asthma claims tend to tick up a bit in the Fall, right around the state was affected by smoke. First step is to account for the temporal trends in asthma.
@@ -148,13 +166,13 @@ asthma_state_aggregate_jul_oct <- wa_state_aggregate %>%
 
 ggplot(asthma_state_aggregate_jul_oct, aes(x = date, y = n)) +
   geom_point() +
-  ggtitle("washington asthma counts for the 2012 fire season")
+  ggtitle("Washington asthma counts for the 2012 fire season")
 
 # counties small multiple plot of asthma count
 ggplot(wash_jul_oct_ts_df, aes(x = date, y = asthma_n_wo_miss)) +
   geom_point() +
   facet_wrap(~county) +
-  ggtitle("asthma counts for the 2012 fire season by county")
+  ggtitle("Asthma counts for the 2012 fire season by county")
 
 ```
 
@@ -162,16 +180,18 @@ It looks like in some of the bigger counties, asthma counts begin to increase in
 
 There is evidence of overdispersion in each county. General Poisson regression may not be appropriate. 
 
-Another issue is how to deal with any potential variation in asthma counts by county. Off the top of my head, it can either be ajusted for as a fixed effect, treated as a random effect, run each counties as seperate models and pool results in a meta-analysis. I'd also like to try an empirical Bayes approach.
+Another issue is how to deal with any potential variation in asthma counts by county. Off the top of my head, it can either be ajusted for as a fixed effect, treated as a random effect, run each counties as seperate models and pool results in a meta-analysis. 
+
 
 ### GLM Poisson without Natrual Spline
 
 Exploring very basic models.
 
 ```{r basic glm regression, echo = F, message = F, results="asis"}
+summary(wash_jul_oct_ts_df)
 # crude model with Poisson distribution
-pois_mod <- glm(asthma_n_wo_miss ~ geo_smk_pm_unit10, wash_jul_oct_ts_df, 
-            family="poisson")
+pois_mod <- glm(asthma_n_wo_miss ~ geo_smk_pm_unit10 + 
+                  offset(log(pop_2012)), wash_jul_oct_ts_df, family="poisson")
 # print mod
 tidy(pois_mod)
 
@@ -179,7 +199,8 @@ tidy(pois_mod)
 summary(pois_mod)$dispersion
 
 # crud model with Quasi-Poisson distribution for overdispersion
-quasipois_mod <- glm(asthma_n_wo_miss ~ geo_smk_pm_unit10, wash_jul_oct_ts_df, 
+quasipois_mod <- glm(asthma_n_wo_miss ~ geo_smk_pm_unit10 +
+                     offset(log(pop_2012)), wash_jul_oct_ts_df, 
             family="quasipoisson")
 # print mod
 tidy(quasipois_mod)
@@ -198,7 +219,8 @@ All subsequent models will use quasipoisson family. Next model adjusts for tempe
 ```{r glm adjusting for temperature, echo = F, message = F, results="asis"}
 
 # adjusted for temp
-quasipois_mod <- glm(asthma_n_wo_miss ~ geo_smk_pm_unit10 + wrf_temp, 
+quasipois_mod <- glm(asthma_n_wo_miss ~ geo_smk_pm_unit10 + wrf_temp +
+                     offset(log(pop_2012)), 
                      wash_jul_oct_ts_df, family="quasipoisson")
 # print mod
 tidy(quasipois_mod)
@@ -208,7 +230,8 @@ summary(quasipois_mod)$dispersion
 
 # adjusting for county as a fixed effect
 quasipois_mod <- glm(asthma_n_wo_miss ~ geo_smk_pm_unit10 + wrf_temp + 
-                          county, wash_jul_oct_ts_df, family="quasipoisson")
+                     county + offset(log(pop_2012)), wash_jul_oct_ts_df, 
+                     family="quasipoisson")
 # print mod
 tidy(quasipois_mod) 
 # dispersion parameter
@@ -224,10 +247,16 @@ Summary from above models is that once county is accounted for, a 10 ug/m^3 incr
 I'm going to try a random effect model with a Poisson distribution, as quasipoisson family does not exist for mixed model package.
 
 ```{r time series with a mixed model, echo = F, message = F, results="asis"}
+# convergence issues when temp is in the model. going to standardize
+wash_jul_oct_ts_df$wrf_temp_sd <- scale(wash_jul_oct_ts_df$wrf_temp,
+                                        center = T, scale = T)
+
+# standarizing fixes the warning messages of the generalized mixed mod
 
 # asthma model where county is a random effect instead of fixed
-mixed_mod <- glmer(asthma_n_wo_miss ~ geo_smk_pm_unit10 + wrf_temp + 
-                  (1|county), wash_jul_oct_ts_df, family = "poisson")
+mixed_mod <- glmer(asthma_n_wo_miss ~ geo_smk_pm_unit10 + wrf_temp_sd + 
+                   offset(log(pop_2012)) + (1|county), wash_jul_oct_ts_df, 
+                   family = "poisson")
 # full output
 summary(mixed_mod)
 
@@ -247,8 +276,8 @@ This approch runs a time series for each county, then pools the results in a met
 
 county_mods <- wash_jul_oct_ts_df %>% 
   group_by(county) %>% # group by county
-  do(geo_smk_beta = glm(asthma_n_wo_miss ~ geo_smk_pm_unit10 + wrf_temp, 
-                        data = ., family="quasipoisson")) 
+  do(geo_smk_beta = glm(asthma_n_wo_miss ~ geo_smk_pm_unit10 + wrf_temp_sd +
+                        offset(log(pop_2012)), data = ., family="quasipoisson")) 
   
 
 county_betas <- tidy(county_mods, geo_smk_beta) %>% 
@@ -295,8 +324,8 @@ asthma_spl <- ns(wash_outcome_counts_pm$date, df = 3)
 # other outcomes? very curious... I will need to look in to this
 
 # model n asthma events with a spline with 7 df (knotches)
-asthma_mod <- glm(asthma_n_wo_miss ~ asthma_spl, wash_outcome_counts_pm, 
-              family="poisson") 
+asthma_mod <- glm(asthma_n_wo_miss ~ asthma_spl,
+                  wash_outcome_counts_pm, family="poisson") 
 
 # check spline fit to asthma
 summary(asthma_mod)
@@ -342,14 +371,13 @@ When using a spline, there is no association between increasing smoke exposure a
 General interpretation would be for a 1 ug/m^3 increase in smoke PM2.5, asthma events increase by 1%.
 
 ```{r simple dlm, echo = F, message = F, results="asis"}
-
 cb1.pm <- crossbasis(wash_ts_df$geo_wt_pm, lag = 15, argvars=list(fun="lin"),
                      arglag=list(fun="poly", degree=3))
 
 summary(cb1.pm)
 
 
-model1 <- glm(asthma_n ~ cb1.pm ,
+model1 <- glm(asthma_n ~ cb1.pm +wrf_temp,
               family=quasipoisson(), wash_ts_df)
 
 summary(model1)
@@ -363,7 +391,6 @@ main="Association with a 1-unit increase in PM2.5")
 
 plot(pred1.pm, "slices", var=10, col=2, cumul=TRUE, ylab="Cumulative RR",
 main="Cumulative association with a 1-unit increase in PM2.5")
-
 
 
 ```
@@ -426,7 +453,7 @@ summary(cb_chelan)
 
 
 # run the model
-model <- glm(asthma_n_wo_miss ~ cb_chelan + ns(date, df=3),
+model <- glm(asthma_n_wo_miss ~ cb_chelan + ns(date, df=3) + wrf_temp,
   family = "quasipoisson", county_list_df[[county_name]])
 
 summary(model)
@@ -496,7 +523,7 @@ for(i in seq(county_list_df)) {
   })
 
   # RUN THE FIRST-STAGE MODELS
-  model <- glm(asthma_n_wo_miss ~ asthma_cb , #+ ns(date, df=3),
+  model <- glm(asthma_n_wo_miss ~ asthma_cb + offset(log(pop_2012)), #+ ns(date, df=3),
     family = "quasipoisson", sub)
   
   summary(model)
@@ -580,8 +607,7 @@ abline(h=1)
 lines(cp_smk10,col=2,lwd=2)
 legend ("top",c("Pooled (with 95%CI)","First-stage region-specific"),
   lty=c(1,2),lwd=1.5,col=c(2,grey(0.7)),bty="n",inset=0.1,cex=0.8)
-mtext(text=paste("Predictor-specific summary for temperature = ",22,
-  "C",sep=""),cex=1)
+mtext(text=paste("Predictor-specific summary"),cex=1)
 
 # this seems to work.
 ```
@@ -637,10 +663,12 @@ for(i in seq(county_list_df)) {
 
 
   # run the first stage models
-  resp_model <- glm(resp_n_wo_miss ~ smk_cb + temp_cb, 
+  resp_model <- glm(resp_n_wo_miss ~ smk_cb + temp_cb + 
+                    offset(log(pop_2012)), 
     family = "quasipoisson", sub)
   
-  cvd_model <- glm(cvd_n_wo_miss ~ smk_cb + temp_cb, 
+  cvd_model <- glm(cvd_n_wo_miss ~ smk_cb + temp_cb + 
+                  offset(log(pop_2012)), 
     family = "quasipoisson", sub)
   
   # reduction to summary results ---
