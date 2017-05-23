@@ -3,14 +3,19 @@
 .RData
 .Ruserdata
 
-/data
+# ignore folder where health data is stored
+*/health_data
 
+# ignore pdf outputs of figures
 *.pdf
-
+# ignore r project file
 *.Rproj
-
-*.html
-
-*.csv
-
+# ignore markdown image
 *.png
+
+# ignore non-zipped shapefile locations
+*.cpg
+*.dbf
+*.prj
+*.shp
+*.shx
