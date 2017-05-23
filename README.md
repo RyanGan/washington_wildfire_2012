@@ -7,7 +7,7 @@ If you have any questions or issues regarding this repository, please contact me
 
 # Overview
 
-This GitHub repository contains R code and most files relevant to the NASA wildfire smoke project and is specific to our work on assessing the relationship between wildfire smoke exposure and hospital-related morbidity in Washington State during the 2012 wildfire season. This Git repository contains code and some data used in the manuscript *Comparison of wildfire smoke estimation methods and associations with cardiopulmonary-related hosptial admissions* found online and opensource here: http://onlinelibrary.wiley.com/doi/10.1002/2017GH000073/full. (Link will be updated once final version comes out).
+This GitHub repository contains R code and most files relevant to the NASA wildfire smoke project and is specific to our work on assessing the relationship between wildfire smoke exposure and hospital-related morbidity in Washington State during the 2012 wildfire season. This Git repository contains code and some data used in the manuscript *Comparison of wildfire smoke estimation methods and associations with cardiopulmonary-related hosptial admissions* found online and open access here: http://onlinelibrary.wiley.com/doi/10.1002/2017GH000073/full. (Link will be updated once final version comes out).
 
 ## Quick Method Outline
 
@@ -41,7 +41,7 @@ This folder contains three folders of scripts for the R statistical computing la
  
 ### data
 
-This folder contains two folders: pm_data and shape_files.
+This folder contains two folders: pm_data and zipped shape_files.
 
 **/data/pm_data/**
 1. background_pm25_wash2012.csv: *This file is the background PM2.5 estiamtes for each WRF-Grid and is used to represent the background PM2.5 levels. The daily grid-level estimates are substracted off the daily grid-level estimates for the other PM2.5 estimation methods to estimate levels of PM2.5 that may be attributed to wildfire smoke.*
@@ -58,4 +58,8 @@ This folder contains two folders: pm_data and shape_files.
 12. zip_pm_to_merge_with_chars.csv: *File that contains daily ZIP code-level estimates of PM2.5 calcuated via WRF-Chem, Kriging, and GWR. Includes smoke PM2.5 estimates for each method. This file is merged with the case-crossover dataframes by date and ZIP code.*
 13. zip_wrfgrid_proportion.csv: *File of proportion overlap between ZIP shapefile and WRF-Grid shapefile.*
 
+**/data/shape_files/**
+1. WAECY_Ecology_Regions.zip: *Shapefile of Washington state government ecology regions. Used to help seperate out state for time-series range of smoke maps.*
+2. wash_grid_shapefile.zip: *Shapefile of WRF-Grid.*
+3. wash_zip_2012_shapefile.zip: *Shapefile of 2012 US zipcode boundaries from US census. I subset to Washington in a script.*
 
