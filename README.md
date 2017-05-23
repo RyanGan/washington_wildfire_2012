@@ -4,16 +4,10 @@
 
 
 ### Overview
-This GitHub repo contains R code relevant to the NASA wildfire smoke project and is specific to our work on 2012 health data from Washington State. 
 
-This project uses protected health information. Therefore, data files are not available due to data use agreements with Washington State Health Department.
+This GitHub repository contains R code and some files relevant to the NASA wildfire smoke project and is specific to our work on assessing the relationship between wildfire smoke exposure and hospital-related morbidity in Washington State during the 2012 wildfire season. This Git repository contains code and some data used in the manuscript "Comparison of wildfire smoke estimation methods and associations with cardiopulmonary-related hosptial admissions" found online and opensource here: http://onlinelibrary.wiley.com/doi/10.1002/2017GH000073/full.
 
-For the Washington state wildfire project, it can be divided in to code for 2 papers at this time. The first is a morbidity paper using zipcode level exposure. The second is a morbidity/mortality paper using county level exposure.
+This project uses protected health information (i.e. admission date of a patient and reported ZIP code) covered by the Health Information Portability and Accountability Act. Therefore, Washington Comprehensive Hospital Abstract Reporting System (CHARS) data are not available due to data use agreements with Washington State Health Department.
 
-There is also a seperate repository for 2015 health data as well as repositories for other states that I have health data on. I will likely consolidate all my project code.
 
-### Comparison of wildfire smoke estimation methods and associations with cardiopulmonary-related admissions
-
-Manuscript code for creating case-crossover datasets can be found "data_management" directory. 
-
-Be sure to put a link here to the CSU repository that contains smoke data as well.
+### Folder Descriptions
