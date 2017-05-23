@@ -46,35 +46,35 @@ zip_grid_proportion <- read_csv(zip_grid_path)
 
 # Importing files that I would like to loop through
 # Geo weighted regresssion (Atmos model of choice)
-geo_wt_path <- paste0("GeoWeightedRidgeRegression_PM2.5_wash2012.csv")
+geo_wt_path <- paste0("geo_weighted_ridge_regression_pm25_wash2012.csv")
 geo_wt <- read_csv(geo_wt_path)
 
 # Global Ridge Regression
-global_path <- paste0("GlobalRidgeRegression_PM2.5_wash2012.csv")
+global_path <- paste0("global_ridge_regression_pm25_wash2012.csv")
 global_reg <- read_csv(global_path)
 
 # Kriging 
-krig_path <- paste0("Kriging_PM2.5_wash2012.csv")
+krig_path <- paste0("kriging_pm25_wash2012.csv")
 krig <- read_csv(krig_path)
 
 # Background PM2.5
-back_path <- paste0("Background_PM2.5_wash2012.csv")
+back_path <- paste0("background_pm25_wash2012.csv")
 background <- read_csv(back_path)
 
 # WRF-Chem
-wrf_path <- paste0("WRF-Chem_PM2.5_wash2012.csv")
+wrf_path <- paste0("wrf_chem_pm25_wash2012.csv")
 wrf <- read_csv(wrf_path)
 
 # WRF-nofire
-wrf_nf_path <- paste0("WRF-Chem_nofire_wash2012.csv")
+wrf_nf_path <- paste0("wrf_chem_nofire_wash2012.csv")
 wrf_nf <- read_csv(wrf_nf_path)
 
 # WRF temperature
-wrf_temp_path <- paste0("WRF-Chem_2mTemperature_wash2012.csv")
+wrf_temp_path <- paste0("wrf_chem_2m_temperature_wash2012.csv")
 wrf_temp <- read_csv(wrf_temp_path)
 
 # WRF planetary bound layer
-wrf_pbl_path <- paste0("WRF-Chem_PBL_wash2012.csv")
+wrf_pbl_path <- paste0("wrf_chem_pbl_wash2012.csv")
 wrf_pbl <- read_csv(wrf_pbl_path)
 
 # Dataframes of PM2.5 attributed to wildfire smoke -----------------------------
