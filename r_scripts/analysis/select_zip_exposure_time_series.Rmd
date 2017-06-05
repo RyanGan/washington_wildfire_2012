@@ -1,0 +1,81 @@
+---
+title: "Select ZIP PM2.5 Timeseries"
+author: "Ryan_Gan"
+date: "June 5, 2017"
+output: html_document
+---
+
+### RE: Matthew Cadlec inquiry on smoke PM~2.5~ values 
+
+This document contains our geo-weighted ridge regression (GWR) summary statistics and time series plots for select ZIP codes from cities around Washington state during the 2012 wildfire season.
+
+Question from Matthew Cadlec:
+
+> *I’m curious what the ranges and means of daily PM2.5 concentrations were in the cities impacted by wildfire smoke as calculated by your geographically weighted ridge regressions.*  
+
+```{r setup, message=F, warning=F}
+# load library
+library(tidyverse)
+
+# read in pm values for smoke
+smoke_path <- paste0("../../data/pm_data/")
+
+zip_pm <- read_csv(paste0(smoke_path, "zip_pm_to_merge_with_chars.csv")) %>% 
+  filter(complete.cases(.))
+```
+
+### Subset of ZIP codes
+
+I'm subsetting our larger ZIP code population-weighted smoke values to the following ZIP codes as representatives of the cities in which they were drawn from.
+
+- Seattle: 98104
+- Tacoma: 98402
+- Wenatchee: 98802
+- Yakima: 98902
+- Kennewick: 99336
+- Spokane: 99201
+
+```{r subset zips, message=F, warning=F, results="asis"}
+zip_sub <- zip_pm %>% 
+  filter(ZIPCODE %in% c(98104, 98402, 98802, 98902, 99336, 99201)) %>% 
+  # assign city names to zips
+  mutate(city = ifelse(ZIPCODE == 98104, "Seattle",
+                ifelse(ZIPCODE == 98402, "Tacoma",
+                ifelse(ZIPCODE == 98802, "Wenatchee",
+                ifelse(ZIPCODE == 98902, "Yakima",
+                ifelse(ZIPCODE == 99336, "Kennewick", "Spokane")))))) %>% 
+  # subset variables to GWR 
+  select(city, ZIPCODE, date, geo_wt_pm, background_pm, geo_smk_pm)
+
+# summarize values requested
+city_summary <- zip_sub %>% 
+  group_by(city) %>% 
+  summarise_each(funs(mean = mean, median= median, 
+                      min = min, max = max), geo_smk_pm) 
+
+# kable table
+knitr::kable(city_summary, caption = paste0("Summary statistics (mean, median,",
+"min, max) over the timeseries for select cities in Washington"))
+
+```
+
+### Timeseries plot for each city (ZIP code)
+
+I've include 3 methods of estimating PM2.5. Background method represents ambient PM~2.5~ levels without smoke present. Geo Wt PM is the untransformed estimate of PM~2.5~ via the GWR method. Geo smk pm subtracts the background level off. 
+
+```{r timeseries, message=F, warning=F, results="asis"}
+# small multiples dataframe
+city_ts_df <- zip_sub %>% 
+  select(-ZIPCODE) %>% 
+  gather(key = pm_method, value = pm, -city, -date)
+
+  
+# small multiples plot
+ggplot(city_ts_df, aes(x=date, y=pm, colour = pm_method)) +
+  geom_line() +
+  facet_wrap(~city) +
+  ylab("PM2.5 ug/m^3") +
+  xlab("Date") + 
+  theme_bw()
+
+```
