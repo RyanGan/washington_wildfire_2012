@@ -19,3 +19,5 @@
 *.prj
 *.shp
 *.shx
+
+select_zip_exposure_time_series.html
