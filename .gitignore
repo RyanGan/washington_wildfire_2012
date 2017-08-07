@@ -6,7 +6,9 @@
 # ignore folder where health data is stored
 */health_data
 # ignore data/too big
-*/data/
+data/
+
+*.html
 
 # ignore pdf outputs of figures
 *.pdf
