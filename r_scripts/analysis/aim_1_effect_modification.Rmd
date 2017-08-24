@@ -55,6 +55,6 @@ asthma <-  read_csv(paste0("./data/health_data/",
 
 ```{r cvd association}
 mod <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk10 + gwr_smk10*geo_wt_pm_zip +
-                wrf_temp_zip + strata(PATIENTID), data = asthma)
+                wrf_temp_zip + strata(PATIENTID), data = mi)
 mod
 ```
