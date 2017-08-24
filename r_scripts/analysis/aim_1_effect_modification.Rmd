@@ -1,0 +1,60 @@
+---
+title: "Aim 1 Pilot Analyses"
+author: "Ryan Gan"
+date: "8/24/2017"
+output: html_document
+---
+
+## Smoke as an effect modifier
+
+```{r libraries}
+library(tidyverse)
+library(survival) 
+```
+
+```{r import data}
+# all cvd
+cvd <- read_csv(paste0("./data/health_data/",
+                "cvd1_jul_to_oct_time_strat_casecross.csv")) %>% 
+  # make indicator variable
+  mutate(gwr_smk0 = ifelse(geo_smk_pm_zip > 0, 1, 0),
+         gwr_smk5 = ifelse(geo_smk_pm_zip > 5, 1, 0),
+         gwr_smk10 = ifelse(geo_smk_pm_zip > 10, 1, 0),
+         gwr_smk15 = ifelse(geo_smk_pm_zip > 15, 1, 0),
+         gwr_smk20 = ifelse(geo_smk_pm_zip > 20, 1, 0))
+# heart failure
+hf <- read_csv(paste0("./data/health_data/",
+                "hf1_jul_to_oct_time_strat_casecross.csv")) %>% 
+  # make indicator variable
+  mutate(gwr_smk0 = ifelse(geo_smk_pm_zip > 0, 1, 0),
+         gwr_smk5 = ifelse(geo_smk_pm_zip > 5, 1, 0),
+         gwr_smk10 = ifelse(geo_smk_pm_zip > 10, 1, 0),
+         gwr_smk15 = ifelse(geo_smk_pm_zip > 15, 1, 0),
+         gwr_smk20 = ifelse(geo_smk_pm_zip > 20, 1, 0))
+# mi
+mi <-  read_csv(paste0("./data/health_data/",
+                "mi1_jul_to_oct_time_strat_casecross.csv")) %>% 
+  # make indicator variable
+  mutate(gwr_smk0 = ifelse(geo_smk_pm_zip > 0, 1, 0),
+         gwr_smk5 = ifelse(geo_smk_pm_zip > 5, 1, 0),
+         gwr_smk10 = ifelse(geo_smk_pm_zip > 10, 1, 0),
+         gwr_smk15 = ifelse(geo_smk_pm_zip > 15, 1, 0),
+         gwr_smk20 = ifelse(geo_smk_pm_zip > 20, 1, 0))
+
+# asthma
+asthma <-  read_csv(paste0("./data/health_data/",
+                "asthma1_jul_to_oct_time_strat_casecross.csv")) %>% 
+  # make indicator variable
+  mutate(gwr_smk0 = ifelse(geo_smk_pm_zip > 0, 1, 0),
+         gwr_smk5 = ifelse(geo_smk_pm_zip > 5, 1, 0),
+         gwr_smk10 = ifelse(geo_smk_pm_zip > 10, 1, 0),
+         gwr_smk15 = ifelse(geo_smk_pm_zip > 15, 1, 0),
+         gwr_smk20 = ifelse(geo_smk_pm_zip > 20, 1, 0))
+
+```
+
+```{r cvd association}
+mod <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk10 + gwr_smk10*geo_wt_pm_zip +
+                wrf_temp_zip + strata(PATIENTID), data = asthma)
+mod
+```
