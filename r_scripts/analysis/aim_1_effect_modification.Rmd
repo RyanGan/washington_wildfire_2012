@@ -9,6 +9,8 @@ output: html_document
 
 This markdown file contains pilot data exploring the relationship between PM~2.5~ and cardiopulmonary hospital ED or urgent care visits. I am using Washington state CHARS data from 2012. I have time-stratified case-crossover designs. I include an interaction term between PM~2.5~ and a binary indicator of smoke.
 
+Things I want to do: check distribution, try out a couple interaction models in case-crossover and time-series, assemble cohort to get some numbers.
+
 ```{r libraries}
 library(tidyverse)
 library(survival) 
