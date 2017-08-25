@@ -7,12 +7,27 @@ output: html_document
 
 ## Smoke as an effect modifier
 
+This markdown file contains pilot data exploring the relationship between PM~2.5~ and cardiopulmonary hospital ED or urgent care visits. I am using Washington state CHARS data from 2012. I have time-stratified case-crossover designs. I include an interaction term between PM~2.5~ and a binary indicator of smoke.
+
 ```{r libraries}
 library(tidyverse)
 library(survival) 
+library(contrast)
 ```
 
-```{r import data}
+Importing a couple of case-crossover datasets.
+
+```{r import data, echo=F, message=F, warning=F}
+# pm2.5 estimates
+pm <- read_csv(paste0("./data/pm_data/zip_pm_to_merge_with_chars.csv")) %>% 
+  na.omit() %>% 
+  # make indicator variable
+  mutate(gwr_smk0 = ifelse(geo_smk_pm> 0, 1, 0),
+         gwr_smk5 = ifelse(geo_smk_pm> 5, 1, 0),
+         gwr_smk10 = ifelse(geo_smk_pm > 10, 1, 0),
+         gwr_smk15 = ifelse(geo_smk_pm > 15, 1, 0),
+         gwr_smk20 = ifelse(geo_smk_pm > 20, 1, 0))
+
 # all cvd
 cvd <- read_csv(paste0("./data/health_data/",
                 "cvd1_jul_to_oct_time_strat_casecross.csv")) %>% 
@@ -50,11 +65,62 @@ asthma <-  read_csv(paste0("./data/health_data/",
          gwr_smk10 = ifelse(geo_smk_pm_zip > 10, 1, 0),
          gwr_smk15 = ifelse(geo_smk_pm_zip > 15, 1, 0),
          gwr_smk20 = ifelse(geo_smk_pm_zip > 20, 1, 0))
+```
+
+## PM~2.5~ characteristics
+
+```{r pm distributions}
+pm_mod <- lm(geo_wt_pm ~ gwr_smk0, data = pm)
+summary(pm_mod)
+
+plot <- ggplot(data=pm, aes(x=geo_wt_pm, group = as.factor(gwr_smk15))) +
+  geom_density(aes(fill = as.factor(gwr_smk15)), alpha = 0.5) +
+  scale_fill_manual(values = c("red", "blue")) +
+  theme_bw()
+plot
+```
+
+## Asthma
+
+Exploring an interaction model with the bellweather outcome, asthma.
+
+
+```{r asthma association}
+mod1 <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk15 + gwr_smk15*geo_wt_pm_zip +
+                wrf_temp_zip + strata(PATIENTID), data =asthma)
+mod1
+mod_var <-vcov(mod1)
+mod_var
+
+gwr_smk_pm <- mod1$coefficients[2] + mod1$coefficients[4]
+
+se_pm_smk <- sqrt((0.12798^2)+(0.01503^2)+(2*-0.00154))
+se_pm_smk
+gwr_smk_pm/se_pm_smk
+
+mod2 <- clogit(outcome ~ geo_smk_pm_zip + wrf_temp_zip + 
+                strata(PATIENTID), data = asthma)
+summary(mod2)
 
 ```
+
 
 ```{r cvd association}
-mod <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk10 + gwr_smk10*geo_wt_pm_zip +
-                wrf_temp_zip + strata(PATIENTID), data = mi)
-mod
+mod <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk5 + gwr_smk5*geo_wt_pm_zip +
+                wrf_temp_zip + strata(PATIENTID), data = cvd)
+summary(mod)
 ```
+
+```{r hf association}
+mod <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk5 + gwr_smk5*geo_wt_pm_zip +
+                wrf_temp_zip + strata(PATIENTID), data = hf)
+summary(mod)
+```
+
+```{r mi association}
+mod <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk5 + gwr_smk5*geo_wt_pm_zip +
+                wrf_temp_zip + strata(PATIENTID), data = mi)
+summary(mod)
+```
+
+
