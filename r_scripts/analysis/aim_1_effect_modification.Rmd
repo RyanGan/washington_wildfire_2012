@@ -71,50 +71,84 @@ asthma <-  read_csv(paste0("./data/health_data/",
 
 ## PM~2.5~ characteristics
 
-```{r pm distributions}
-pm_mod <- lm(geo_wt_pm ~ gwr_smk0, data = pm)
-summary(pm_mod)
+Background smoke for a given grid is the median value for that month when smoke is not over the grid, determined by HMS. I subtract backround smoke off the GWR estimate for the grid and population-weight by zipcode. In order to increase the specificity for PM~2.5~ due to wildfire smoke, I'll set a binary cutoff of >10 ug/m^3 above the GWR estimate minus background estimate.I will explore the best way to set a binary cutoff in the grant.
 
-plot <- ggplot(data=pm, aes(x=geo_wt_pm, group = as.factor(gwr_smk15))) +
-  geom_density(aes(fill = as.factor(gwr_smk15)), alpha = 0.5) +
+```{r pm distributions, echo=F, message=F, warning=F}
+pm_mean <- pm %>% 
+  group_by(gwr_smk10) %>% 
+  summarise(pm_mean = mean(geo_wt_pm))
+
+plot <- ggplot(data=pm, aes(x=geo_wt_pm, group = as.factor(gwr_smk10))) +
+  geom_density(aes(fill = as.factor(gwr_smk10)), alpha = 0.5) +
   scale_fill_manual(values = c("red", "blue")) +
+  geom_vline(data = pm_mean, aes(xintercept=pm_mean, group = gwr_smk10),
+             color = c("red", "blue"), linetype = "dotted") +
   theme_bw()
-plot
+# print plot
+print(plot)
 ```
 
 ## Asthma
 
-Exploring an interaction model with the bellweather outcome, asthma.
-
+Exploring an interaction model between PM~2.5~ (untransformed) and the binary smoke indicator on asthma.
 
 ```{r asthma association}
-mod1 <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk15 + gwr_smk15*geo_wt_pm_zip +
+mod1 <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk10 + gwr_smk10*geo_wt_pm_zip +
                 wrf_temp_zip + strata(PATIENTID), data =asthma)
-mod1
-mod_var <-vcov(mod1)
-mod_var
+mod2 <- broom::tidy(mod1)
+mod2
 
-gwr_smk_pm <- mod1$coefficients[2] + mod1$coefficients[4]
+# non-smoke estimate
+pm_est <- mod2 %>% filter(term == "geo_wt_pm_zip") %>% 
+  select(term, estimate, std.error)
 
-se_pm_smk <- sqrt((0.12798^2)+(0.01503^2)+(2*-0.00154))
+# smoke estimates
+smk_pm_est <- mod2 %>% 
+  filter(term == "gwr_smk10" | term == "geo_wt_pm_zip:gwr_smk10") %>% 
+  select(term, estimate, std.error)
+# extract covariance for the binary indicator and the interaction slope
+mod_cov <-vcov(mod1)[4,2]
+mod_cov
+# calculate new std err
+se_pm_smk <- sqrt(smk_pm_est[1,3]^2 + smk_pm_est[2,3]^2 + (2*mod_cov))
 se_pm_smk
-gwr_smk_pm/se_pm_smk
+
+mod2
+# estimates
+pm_vals_to_est <- seq(0, 200, by = 10) %>% 
+  tibble() %>% 
+  rename(pm_val = ".") %>% 
+  mutate(beta_pm = pm_val*pm_est[1,2],
+         pm_lower = beta_pm - (1.96*pm_est[1,3]),
+         pm_upper = beta_pm + (1.96*pm_est[1,3]),
+         beta_smk_pm = smk_pm_est[1,2]+(pm_val*smk_pm_est[2,2]),
+         smk_pm_lower = beta_smk_pm - (1.96*se_pm_smk),
+         smk_pm_upper = beta_smk_pm + (1.96*se_pm_smk))%>% 
+  mutate_at(vars(beta_pm:pm_upper),funs(exp(.)-1))
+
 
 mod2 <- clogit(outcome ~ geo_smk_pm_zip + wrf_temp_zip + 
                 strata(PATIENTID), data = asthma)
 summary(mod2)
-
 ```
 
 
 ```{r cvd association}
-mod <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk5 + gwr_smk5*geo_wt_pm_zip +
+mod <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk10 + gwr_smk10*geo_wt_pm_zip +
                 wrf_temp_zip + strata(PATIENTID), data = cvd)
 summary(mod)
 ```
 
 ```{r hf association}
-mod <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk5 + gwr_smk5*geo_wt_pm_zip +
+# binned pm
+pm_bin <- cut
+
+
+pm_hf <- hf %>% 
+  filter(outcome == 1) %>% 
+  
+
+mod <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk0 + gwr_smk0*geo_wt_pm_zip +
                 wrf_temp_zip + strata(PATIENTID), data = hf)
 summary(mod)
 ```
