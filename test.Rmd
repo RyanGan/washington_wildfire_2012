@@ -1,0 +1,35 @@
+---
+title: "Stuff"
+author: "Ryan Gan"
+date: "8/29/2017"
+output: html_document
+---
+
+```{r libraries}
+library(tidyverse)
+```
+
+
+```{r sim data}
+sim_data <- sort(rep(c(10, 50, 100), 9)) %>% 
+  as_tibble() %>%
+  rename(cluster = value) %>% 
+  group_by(cluster) %>% 
+  mutate(n = sort(rep(c(50, 100, 500), 3))) %>% 
+  group_by(cluster, n) %>%
+  mutate(rate = sort(rep(c(0.10, 0.25, 0.50), 1))) %>% 
+  ungroup() %>% 
+  mutate(reliability = c(0.515, 0.67, 0.734, 0.658, 0.804, 0.846, 0.912, 0.957, 
+          0.968, 0.579, 0.741, 0.793, 0.732, 0.851, 0.885, 0.931, 0.966, 0.975, 
+          0.593, 0.749, 0.799, 0.742, 0.856, 0.889, 0.933, 0.967, 0.976))
+
+sim_data
+```
+
+```{r, plot}
+ggplot(data = sim_data, aes(x = n, y = reliability, color = as.factor(rate))) +
+  geom_point() +
+  geom_line() +
+  facet_wrap(~cluster) +
+  theme_bw()
+```
