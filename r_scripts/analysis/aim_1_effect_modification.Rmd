@@ -93,10 +93,30 @@ print(plot)
 Exploring an interaction model between PM~2.5~ (untransformed) and the binary smoke indicator on asthma.
 
 ```{r asthma association}
-mod1 <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk10 + gwr_smk10*geo_wt_pm_zip +
-                wrf_temp_zip + strata(PATIENTID), data =asthma)
-mod2 <- broom::tidy(mod1)
-mod2
+mod1 <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk10 +
+          gwr_smk10*geo_wt_pm_zip + wrf_temp_zip + 
+            strata(PATIENTID), data =asthma)
+
+# new data set to fit clogit prediction model on
+est_data <- rep(seq(from = 0, to = 200, by = 10), 2) %>% 
+  as_tibble() %>% 
+  rename(geo_wt_pm_zip = value) %>% 
+  group_by(geo_wt_pm_zip) %>% 
+  mutate(gwr_smk10 = c(0,1)) %>% 
+  ungroup() %>% 
+  mutate(PATIENTID= 341,
+         wrf_temp_zip = 294) %>% 
+  mutate(rr = predict(mod1, newdata=., type = "risk"),
+         rel_risk = ifelse(geo_wt_pm_zip < 50 & gwr_smk10 == 0, rr, 
+                    ifelse(geo_wt_pm_zip > 50 & gwr_smk10 == 0, NA,
+                           rr)),
+         risk = rel_risk-1) 
+  
+ggplot(data = est_data, aes(x = geo_wt_pm_zip, y = risk, color = as.factor(gwr_smk10))) +
+  geom_line() + 
+  theme_bw()
+
+# need to figure out how to add CI lines.
 
 # non-smoke estimate
 pm_est <- mod2 %>% filter(term == "geo_wt_pm_zip") %>% 
@@ -134,29 +154,79 @@ summary(mod2)
 
 
 ```{r cvd association}
-mod <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk10 + gwr_smk10*geo_wt_pm_zip +
-                wrf_temp_zip + strata(PATIENTID), data = cvd)
-summary(mod)
+mod <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk10 +
+        gwr_smk10*geo_wt_pm_zip +
+        wrf_temp_zip + strata(PATIENTID), data = cvd)
+
+# new data set to fit clogit prediction model on
+est_data <- rep(seq(from = 0, to = 200, by = 10), 2) %>% 
+  as_tibble() %>% 
+  rename(geo_wt_pm_zip = value) %>% 
+  group_by(geo_wt_pm_zip) %>% 
+  mutate(gwr_smk10 = c(0,1)) %>% 
+  ungroup() %>% 
+  mutate(PATIENTID= 226,
+         wrf_temp_zip = 294) %>% 
+  mutate(rr = predict(mod, newdata=., type = "risk"),
+         rel_risk = ifelse(geo_wt_pm_zip < 50 & gwr_smk10 == 0, rr, 
+                    ifelse(geo_wt_pm_zip > 50 & gwr_smk10 == 0, NA,
+                           rr)),
+         risk = rel_risk-1) 
+
+ggplot(data = est_data, aes(x = geo_wt_pm_zip, y = risk, color = as.factor(gwr_smk10))) +
+  geom_line() + 
+  theme_bw()
 ```
 
 ```{r hf association}
-# binned pm
-pm_bin <- cut
+mod <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk10 +
+        gwr_smk10*geo_wt_pm_zip +
+        wrf_temp_zip + strata(PATIENTID), data = hf)
 
+# new data set to fit clogit prediction model on
+est_data <- rep(seq(from = 0, to = 200, by = 10), 2) %>% 
+  as_tibble() %>% 
+  rename(geo_wt_pm_zip = value) %>% 
+  group_by(geo_wt_pm_zip) %>% 
+  mutate(gwr_smk10 = c(0,1)) %>% 
+  ungroup() %>% 
+  mutate(PATIENTID= 226,
+         wrf_temp_zip = 294) %>% 
+  mutate(rr = predict(mod, newdata=., type = "risk"),
+         rel_risk = ifelse(geo_wt_pm_zip < 50 & gwr_smk10 == 0, rr, 
+                    ifelse(geo_wt_pm_zip > 50 & gwr_smk10 == 0, NA,
+                           rr)),
+         risk = rel_risk-1) 
 
-pm_hf <- hf %>% 
-  filter(outcome == 1) %>% 
-  
-
-mod <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk0 + gwr_smk0*geo_wt_pm_zip +
-                wrf_temp_zip + strata(PATIENTID), data = hf)
-summary(mod)
+ggplot(data = est_data, aes(x = geo_wt_pm_zip, y = risk, color = as.factor(gwr_smk10))) +
+  geom_line() + 
+  theme_bw()
 ```
 
 ```{r mi association}
-mod <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk5 + gwr_smk5*geo_wt_pm_zip +
-                wrf_temp_zip + strata(PATIENTID), data = mi)
-summary(mod)
+mod <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk10 +
+        gwr_smk10*geo_wt_pm_zip +
+        wrf_temp_zip + strata(PATIENTID), data = mi)
+
+# new data set to fit clogit prediction model on
+est_data <- rep(seq(from = 0, to = 200, by = 10), 2) %>% 
+  as_tibble() %>% 
+  rename(geo_wt_pm_zip = value) %>% 
+  group_by(geo_wt_pm_zip) %>% 
+  mutate(gwr_smk10 = c(0,1)) %>% 
+  ungroup() %>% 
+  mutate(PATIENTID= 2598,
+         wrf_temp_zip = 294) %>% 
+  mutate(rr = predict(mod, newdata=., type = "risk"),
+         rel_risk = ifelse(geo_wt_pm_zip < 50 & gwr_smk10 == 0, rr, 
+                    ifelse(geo_wt_pm_zip > 50 & gwr_smk10 == 0, NA,
+                           rr)),
+         risk = rel_risk-1) 
+
+
+ggplot(data = est_data, aes(x = geo_wt_pm_zip, y = risk, color = as.factor(gwr_smk10))) +
+  geom_line() +
+  theme_bw()
 ```
 
 
