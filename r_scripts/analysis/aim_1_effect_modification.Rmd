@@ -20,8 +20,10 @@ library(contrast)
 Importing a couple of case-crossover datasets.
 
 ```{r import data, echo=F, message=F, warning=F}
+path <- "../.."
+
 # pm2.5 estimates
-pm <- read_csv(paste0("../../data/pm_data/zip_pm_to_merge_with_chars.csv")) %>% 
+pm <- read_csv(paste0(path,"/data/pm_data/zip_pm_to_merge_with_chars.csv")) %>% 
   na.omit() %>% 
   # make indicator variable
   mutate(gwr_smk0 = ifelse(geo_smk_pm> 0, 1, 0),
@@ -31,7 +33,7 @@ pm <- read_csv(paste0("../../data/pm_data/zip_pm_to_merge_with_chars.csv")) %>%
          gwr_smk20 = ifelse(geo_smk_pm > 20, 1, 0))
 
 # all cvd
-cvd <- read_csv(paste0("../../data/health_data/",
+cvd <- read_csv(paste0(path,"/data/health_data/",
                 "cvd1_jul_to_oct_time_strat_casecross.csv")) %>% 
   # make indicator variable
   mutate(gwr_smk0 = ifelse(geo_smk_pm_zip > 0, 1, 0),
@@ -40,7 +42,7 @@ cvd <- read_csv(paste0("../../data/health_data/",
          gwr_smk15 = ifelse(geo_smk_pm_zip > 15, 1, 0),
          gwr_smk20 = ifelse(geo_smk_pm_zip > 20, 1, 0))
 # heart failure
-hf <- read_csv(paste0("../../data/health_data/",
+hf <- read_csv(paste0(path, "/data/health_data/",
                 "hf1_jul_to_oct_time_strat_casecross.csv")) %>% 
   # make indicator variable
   mutate(gwr_smk0 = ifelse(geo_smk_pm_zip > 0, 1, 0),
@@ -49,7 +51,7 @@ hf <- read_csv(paste0("../../data/health_data/",
          gwr_smk15 = ifelse(geo_smk_pm_zip > 15, 1, 0),
          gwr_smk20 = ifelse(geo_smk_pm_zip > 20, 1, 0))
 # mi
-mi <-  read_csv(paste0("../../data/health_data/",
+mi <-  read_csv(paste0(path,"/data/health_data/",
                 "mi1_jul_to_oct_time_strat_casecross.csv")) %>% 
   # make indicator variable
   mutate(gwr_smk0 = ifelse(geo_smk_pm_zip > 0, 1, 0),
@@ -59,7 +61,7 @@ mi <-  read_csv(paste0("../../data/health_data/",
          gwr_smk20 = ifelse(geo_smk_pm_zip > 20, 1, 0))
 
 # asthma
-asthma <-  read_csv(paste0("../../data/health_data/",
+asthma <-  read_csv(paste0(path,"/data/health_data/",
                 "asthma1_jul_to_oct_time_strat_casecross.csv")) %>% 
   # make indicator variable
   mutate(gwr_smk0 = ifelse(geo_smk_pm_zip > 0, 1, 0),
@@ -93,10 +95,11 @@ print(plot)
 Exploring an interaction model between PM~2.5~ (untransformed) and the binary smoke indicator on asthma.
 
 ```{r asthma association}
-mod1 <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk10 +
+mod <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk10 +
           gwr_smk10*geo_wt_pm_zip + wrf_temp_zip + 
             strata(PATIENTID), data =asthma)
 
+mod
 # new data set to fit clogit prediction model on
 est_data <- rep(seq(from = 0, to = 200, by = 10), 2) %>% 
   as_tibble() %>% 
@@ -106,50 +109,17 @@ est_data <- rep(seq(from = 0, to = 200, by = 10), 2) %>%
   ungroup() %>% 
   mutate(PATIENTID= 341,
          wrf_temp_zip = 294) %>% 
-  mutate(rr = predict(mod1, newdata=., type = "risk"),
-         rel_risk = ifelse(geo_wt_pm_zip < 50 & gwr_smk10 == 0, rr, 
-                    ifelse(geo_wt_pm_zip > 50 & gwr_smk10 == 0, NA,
-                           rr)),
+  mutate(rel_risk = predict(mod, newdata=., type = "risk"),
+         # rel_risk = ifelse(geo_wt_pm_zip < 50 & gwr_smk10 == 0, rr, 
+         #            ifelse(geo_wt_pm_zip > 50 & gwr_smk10 == 0, NA,
+         #                   rr)),
          risk = rel_risk-1) 
   
-ggplot(data = est_data, aes(x = geo_wt_pm_zip, y = risk, color = as.factor(gwr_smk10))) +
+ggplot(data = est_data, aes(x = geo_wt_pm_zip, y = risk, 
+                            color = as.factor(gwr_smk10))) +
   geom_line() + 
+  scale_y_continuous(name = "additive risk %",  limits =c(-.5, 5)) +
   theme_bw()
-
-# need to figure out how to add CI lines.
-
-# non-smoke estimate
-pm_est <- mod2 %>% filter(term == "geo_wt_pm_zip") %>% 
-  select(term, estimate, std.error)
-
-# smoke estimates
-smk_pm_est <- mod2 %>% 
-  filter(term == "gwr_smk10" | term == "geo_wt_pm_zip:gwr_smk10") %>% 
-  select(term, estimate, std.error)
-# extract covariance for the binary indicator and the interaction slope
-mod_cov <-vcov(mod1)[4,2]
-mod_cov
-# calculate new std err
-se_pm_smk <- sqrt(smk_pm_est[1,3]^2 + smk_pm_est[2,3]^2 + (2*mod_cov))
-se_pm_smk
-
-mod2
-# estimates
-pm_vals_to_est <- seq(0, 200, by = 10) %>% 
-  tibble() %>% 
-  rename(pm_val = ".") %>% 
-  mutate(beta_pm = pm_val*pm_est[1,2],
-         pm_lower = beta_pm - (1.96*pm_est[1,3]),
-         pm_upper = beta_pm + (1.96*pm_est[1,3]),
-         beta_smk_pm = smk_pm_est[1,2]+(pm_val*smk_pm_est[2,2]),
-         smk_pm_lower = beta_smk_pm - (1.96*se_pm_smk),
-         smk_pm_upper = beta_smk_pm + (1.96*se_pm_smk))%>% 
-  mutate_at(vars(beta_pm:pm_upper),funs(exp(.)-1))
-
-
-mod2 <- clogit(outcome ~ geo_smk_pm_zip + wrf_temp_zip + 
-                strata(PATIENTID), data = asthma)
-summary(mod2)
 ```
 
 
@@ -157,7 +127,7 @@ summary(mod2)
 mod <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk10 +
         gwr_smk10*geo_wt_pm_zip +
         wrf_temp_zip + strata(PATIENTID), data = cvd)
-
+mod
 # new data set to fit clogit prediction model on
 est_data <- rep(seq(from = 0, to = 200, by = 10), 2) %>% 
   as_tibble() %>% 
@@ -173,7 +143,8 @@ est_data <- rep(seq(from = 0, to = 200, by = 10), 2) %>%
                            rr)),
          risk = rel_risk-1) 
 
-ggplot(data = est_data, aes(x = geo_wt_pm_zip, y = risk, color = as.factor(gwr_smk10))) +
+ggplot(data = est_data, aes(x = geo_wt_pm_zip, y = risk, 
+                            color = as.factor(gwr_smk10))) +
   geom_line() + 
   theme_bw()
 ```
@@ -183,6 +154,7 @@ mod <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk10 +
         gwr_smk10*geo_wt_pm_zip +
         wrf_temp_zip + strata(PATIENTID), data = hf)
 
+mod
 # new data set to fit clogit prediction model on
 est_data <- rep(seq(from = 0, to = 200, by = 10), 2) %>% 
   as_tibble() %>% 
@@ -207,7 +179,7 @@ ggplot(data = est_data, aes(x = geo_wt_pm_zip, y = risk, color = as.factor(gwr_s
 mod <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk10 +
         gwr_smk10*geo_wt_pm_zip +
         wrf_temp_zip + strata(PATIENTID), data = mi)
-
+mod
 # new data set to fit clogit prediction model on
 est_data <- rep(seq(from = 0, to = 200, by = 10), 2) %>% 
   as_tibble() %>% 
@@ -224,7 +196,8 @@ est_data <- rep(seq(from = 0, to = 200, by = 10), 2) %>%
          risk = rel_risk-1) 
 
 
-ggplot(data = est_data, aes(x = geo_wt_pm_zip, y = risk, color = as.factor(gwr_smk10))) +
+ggplot(data = est_data, aes(x = geo_wt_pm_zip, y = risk, 
+                            color = as.factor(gwr_smk10))) +
   geom_line() +
   theme_bw()
 ```
