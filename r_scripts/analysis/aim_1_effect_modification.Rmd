@@ -21,7 +21,7 @@ Importing a couple of case-crossover datasets.
 
 ```{r import data, echo=F, message=F, warning=F}
 # pm2.5 estimates
-pm <- read_csv(paste0("./data/pm_data/zip_pm_to_merge_with_chars.csv")) %>% 
+pm <- read_csv(paste0("../../data/pm_data/zip_pm_to_merge_with_chars.csv")) %>% 
   na.omit() %>% 
   # make indicator variable
   mutate(gwr_smk0 = ifelse(geo_smk_pm> 0, 1, 0),
@@ -31,7 +31,7 @@ pm <- read_csv(paste0("./data/pm_data/zip_pm_to_merge_with_chars.csv")) %>%
          gwr_smk20 = ifelse(geo_smk_pm > 20, 1, 0))
 
 # all cvd
-cvd <- read_csv(paste0("./data/health_data/",
+cvd <- read_csv(paste0("../../data/health_data/",
                 "cvd1_jul_to_oct_time_strat_casecross.csv")) %>% 
   # make indicator variable
   mutate(gwr_smk0 = ifelse(geo_smk_pm_zip > 0, 1, 0),
@@ -40,7 +40,7 @@ cvd <- read_csv(paste0("./data/health_data/",
          gwr_smk15 = ifelse(geo_smk_pm_zip > 15, 1, 0),
          gwr_smk20 = ifelse(geo_smk_pm_zip > 20, 1, 0))
 # heart failure
-hf <- read_csv(paste0("./data/health_data/",
+hf <- read_csv(paste0("../../data/health_data/",
                 "hf1_jul_to_oct_time_strat_casecross.csv")) %>% 
   # make indicator variable
   mutate(gwr_smk0 = ifelse(geo_smk_pm_zip > 0, 1, 0),
@@ -49,7 +49,7 @@ hf <- read_csv(paste0("./data/health_data/",
          gwr_smk15 = ifelse(geo_smk_pm_zip > 15, 1, 0),
          gwr_smk20 = ifelse(geo_smk_pm_zip > 20, 1, 0))
 # mi
-mi <-  read_csv(paste0("./data/health_data/",
+mi <-  read_csv(paste0("../../data/health_data/",
                 "mi1_jul_to_oct_time_strat_casecross.csv")) %>% 
   # make indicator variable
   mutate(gwr_smk0 = ifelse(geo_smk_pm_zip > 0, 1, 0),
@@ -59,7 +59,7 @@ mi <-  read_csv(paste0("./data/health_data/",
          gwr_smk20 = ifelse(geo_smk_pm_zip > 20, 1, 0))
 
 # asthma
-asthma <-  read_csv(paste0("./data/health_data/",
+asthma <-  read_csv(paste0("../../data/health_data/",
                 "asthma1_jul_to_oct_time_strat_casecross.csv")) %>% 
   # make indicator variable
   mutate(gwr_smk0 = ifelse(geo_smk_pm_zip > 0, 1, 0),
