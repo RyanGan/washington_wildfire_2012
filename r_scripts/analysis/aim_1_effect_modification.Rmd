@@ -21,7 +21,7 @@ Importing a couple of case-crossover datasets.
 
 ```{r import data, echo=F, message=F, warning=F}
 path <- "../.."
-
+#path <- "."
 # pm2.5 estimates
 pm <- read_csv(paste0(path,"/data/pm_data/zip_pm_to_merge_with_chars.csv")) %>% 
   na.omit() %>% 
@@ -30,7 +30,8 @@ pm <- read_csv(paste0(path,"/data/pm_data/zip_pm_to_merge_with_chars.csv")) %>%
          gwr_smk5 = ifelse(geo_smk_pm> 5, 1, 0),
          gwr_smk10 = ifelse(geo_smk_pm > 10, 1, 0),
          gwr_smk15 = ifelse(geo_smk_pm > 15, 1, 0),
-         gwr_smk20 = ifelse(geo_smk_pm > 20, 1, 0))
+         gwr_smk20 = ifelse(geo_smk_pm > 20, 1, 0),
+         gwr_10unit = geo_wt_pm_zip/10)
 
 # all cvd
 cvd <- read_csv(paste0(path,"/data/health_data/",
@@ -40,7 +41,8 @@ cvd <- read_csv(paste0(path,"/data/health_data/",
          gwr_smk5 = ifelse(geo_smk_pm_zip > 5, 1, 0),
          gwr_smk10 = ifelse(geo_smk_pm_zip > 10, 1, 0),
          gwr_smk15 = ifelse(geo_smk_pm_zip > 15, 1, 0),
-         gwr_smk20 = ifelse(geo_smk_pm_zip > 20, 1, 0))
+         gwr_smk20 = ifelse(geo_smk_pm_zip > 20, 1, 0),
+         gwr_10unit = geo_wt_pm_zip/10)
 # heart failure
 hf <- read_csv(paste0(path, "/data/health_data/",
                 "hf1_jul_to_oct_time_strat_casecross.csv")) %>% 
@@ -49,7 +51,8 @@ hf <- read_csv(paste0(path, "/data/health_data/",
          gwr_smk5 = ifelse(geo_smk_pm_zip > 5, 1, 0),
          gwr_smk10 = ifelse(geo_smk_pm_zip > 10, 1, 0),
          gwr_smk15 = ifelse(geo_smk_pm_zip > 15, 1, 0),
-         gwr_smk20 = ifelse(geo_smk_pm_zip > 20, 1, 0))
+         gwr_smk20 = ifelse(geo_smk_pm_zip > 20, 1, 0),
+         gwr_10unit = geo_wt_pm_zip/10)
 # mi
 mi <-  read_csv(paste0(path,"/data/health_data/",
                 "mi1_jul_to_oct_time_strat_casecross.csv")) %>% 
@@ -58,7 +61,8 @@ mi <-  read_csv(paste0(path,"/data/health_data/",
          gwr_smk5 = ifelse(geo_smk_pm_zip > 5, 1, 0),
          gwr_smk10 = ifelse(geo_smk_pm_zip > 10, 1, 0),
          gwr_smk15 = ifelse(geo_smk_pm_zip > 15, 1, 0),
-         gwr_smk20 = ifelse(geo_smk_pm_zip > 20, 1, 0))
+         gwr_smk20 = ifelse(geo_smk_pm_zip > 20, 1, 0),
+         gwr_10unit = geo_wt_pm_zip/10)
 
 # asthma
 asthma <-  read_csv(paste0(path,"/data/health_data/",
@@ -68,22 +72,23 @@ asthma <-  read_csv(paste0(path,"/data/health_data/",
          gwr_smk5 = ifelse(geo_smk_pm_zip > 5, 1, 0),
          gwr_smk10 = ifelse(geo_smk_pm_zip > 10, 1, 0),
          gwr_smk15 = ifelse(geo_smk_pm_zip > 15, 1, 0),
-         gwr_smk20 = ifelse(geo_smk_pm_zip > 20, 1, 0))
+         gwr_smk20 = ifelse(geo_smk_pm_zip > 20, 1, 0),
+         gwr_10unit = geo_wt_pm_zip/10)
 ```
 
 ## PM~2.5~ characteristics
 
-Background smoke for a given grid is the median value for that month when smoke is not over the grid, determined by HMS. I subtract backround smoke off the GWR estimate for the grid and population-weight by zipcode. In order to increase the specificity for PM~2.5~ due to wildfire smoke, I'll set a binary cutoff of >10 ug/m^3 above the GWR estimate minus background estimate.I will explore the best way to set a binary cutoff in the grant.
+Background smoke for a given grid is the median value for that month when smoke is not over the grid, determined by HMS. I subtract backround smoke off the GWR estimate for the grid and population-weight by zipcode. In order to increase the specificity for PM~2.5~ due to wildfire smoke, I'll set a binary cutoff of >5 ug/m^3 above the GWR estimate minus background estimate to increase the specificity slightly.I will explore the best way to set a binary cutoff in the grant.
 
 ```{r pm distributions, echo=F, message=F, warning=F}
 pm_mean <- pm %>% 
-  group_by(gwr_smk10) %>% 
+  group_by(gwr_smk5) %>% 
   summarise(pm_mean = mean(geo_wt_pm))
 
-plot <- ggplot(data=pm, aes(x=geo_wt_pm, group = as.factor(gwr_smk10))) +
-  geom_density(aes(fill = as.factor(gwr_smk10)), alpha = 0.5) +
+plot <- ggplot(data=pm, aes(x=geo_wt_pm, group = as.factor(gwr_smk5))) +
+  geom_density(aes(fill = as.factor(gwr_smk5)), alpha = 0.5) +
   scale_fill_manual(values = c("red", "blue")) +
-  geom_vline(data = pm_mean, aes(xintercept=pm_mean, group = gwr_smk10),
+  geom_vline(data = pm_mean, aes(xintercept=pm_mean, group = gwr_smk5),
              color = c("red", "blue"), linetype = "dotted") +
   theme_bw()
 # print plot
@@ -92,114 +97,231 @@ print(plot)
 
 ## Asthma
 
-Exploring an interaction model between PM~2.5~ (untransformed) and the binary smoke indicator on asthma.
+Exploring an interaction model between PM~2.5~ and the binary smoke indicator on asthma.
 
 ```{r asthma association}
-mod <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk10 +
-          gwr_smk10*geo_wt_pm_zip + wrf_temp_zip + 
+mod <- clogit(outcome ~ gwr_10unit + gwr_smk5 +
+          gwr_smk5*gwr_10unit  + wrf_temp_zip + 
             strata(PATIENTID), data =asthma)
+n_obs <- mod$nevent
+cov_matrix <- mod$var
+# evidence for interaction
+mod_tidy <- broom::tidy(mod)
 
-mod
-# new data set to fit clogit prediction model on
-est_data <- rep(seq(from = 0, to = 200, by = 10), 2) %>% 
+# effect estimate of odds ratio table
+effect_table <- matrix(data = NA, nrow = 4, ncol = 5) %>% 
   as_tibble() %>% 
-  rename(geo_wt_pm_zip = value) %>% 
-  group_by(geo_wt_pm_zip) %>% 
-  mutate(gwr_smk10 = c(0,1)) %>% 
-  ungroup() %>% 
-  mutate(PATIENTID= 341,
-         wrf_temp_zip = 294) %>% 
-  mutate(rel_risk = predict(mod, newdata=., type = "risk"),
-         # rel_risk = ifelse(geo_wt_pm_zip < 50 & gwr_smk10 == 0, rr, 
-         #            ifelse(geo_wt_pm_zip > 50 & gwr_smk10 == 0, NA,
-         #                   rr)),
-         risk = rel_risk-1) 
-  
-ggplot(data = est_data, aes(x = geo_wt_pm_zip, y = risk, 
-                            color = as.factor(gwr_smk10))) +
-  geom_line() + 
-  scale_y_continuous(name = "additive risk %",  limits =c(-.5, 5)) +
-  theme_bw()
+  rename(estimate = V1, 
+         odds_ratio = V2,
+         lower95 = V3,
+         upper95 = V4,
+         p_val = V5)
+
+effect_table[,1] <- c("pm_10unit", "smoke", "pm_diff","pm_smoke_10unit") 
+# populate table 
+effect_table[1,2:4] <- round(exp(mod_tidy[1, c(2,6:7)]),2) # OR and 95CI
+effect_table[1,5] <- round(mod_tidy[1,5],2) # pval
+effect_table[2,2:4] <- round(exp(mod_tidy[2, c(2,6:7)]),2) # OR and 95CI
+effect_table[2,5] <- round(mod_tidy[2,5],2) # pval
+# test for interaction
+effect_table[3,2:4] <- round(exp(mod_tidy[4, c(2,6:7)]),2) # OR and 95CI
+effect_table[3,5] <- round(mod_tidy[4,5],2) # pval
+
+# linear combination estimate for smoke pm2.5
+lin_combo <- c(1,0,0,1)
+# estimate 
+est <- as.numeric(t(lin_combo) %*% mod$coefficients)
+# std error
+se <- as.numeric(sqrt(t(lin_combo) %*% mod$var %*% lin_combo))
+# calculate bounds
+l95 <- est - (1.96*se)
+u95 <- est + (1.96*se)
+# calcuate z statistic and p val
+z <- est/se
+p <- 2*pnorm(-abs(z))
+# fill in table
+effect_table[4, 2:4] <- round(exp(c(est, l95, u95)),2)
+# p val
+effect_table[4,5] <- round(p,2)
+
+knitr::kable(effect_table, 
+  caption = paste0("Asthma and PM2.5 effect modification estimates"))
 ```
 
+The p-value for pm_diff (test for difference in CR function) may indicate marginal difference between effect estimates. The effect estimate for a 10 ug/m^3 increase in PM~2.5~ suggests a 10% increase for asthma, however the confidence interval suggests this is not a significant finding. In the context of other studies, this effect estimate is in line with the larger air pollution literature and I would conclude that it's not significant because it's power challenged. I expect that this term will be significant as we add addition years and states to the analysis.
+
+Our indicator of a smoke day indicates that the risk for an asthma event on a smoke day is 26% greater than a non-smoke day and that this effect is significant.
+
+The PM~2.5~ response on a smoke day indicates that a 10 ug/m^3 increase in PM~2.5~ increases risk for asthma by 7% and that this is a significant. This is the same magnitude of response we found in our Washington study when we subtracted off the baseline level.
+
+```{r asthma power}
+n <- 1500
+# assuming roughly 8% of smoke days
+sim_data <- as_tibble(rbinom(n, 1, prob = 0.08)) %>% 
+  rename(gwr_smk5)
+mean(sim_data$value)
+mean(pm$gwr_smk5)
+mean(pm$geo_wt_pm)
+sd(pm$geo_wt_pm)
+```
+
+## All CVD
 
 ```{r cvd association}
-mod <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk10 +
-        gwr_smk10*geo_wt_pm_zip +
-        wrf_temp_zip + strata(PATIENTID), data = cvd)
-mod
-# new data set to fit clogit prediction model on
-est_data <- rep(seq(from = 0, to = 200, by = 10), 2) %>% 
-  as_tibble() %>% 
-  rename(geo_wt_pm_zip = value) %>% 
-  group_by(geo_wt_pm_zip) %>% 
-  mutate(gwr_smk10 = c(0,1)) %>% 
-  ungroup() %>% 
-  mutate(PATIENTID= 226,
-         wrf_temp_zip = 294) %>% 
-  mutate(rr = predict(mod, newdata=., type = "risk"),
-         rel_risk = ifelse(geo_wt_pm_zip < 50 & gwr_smk10 == 0, rr, 
-                    ifelse(geo_wt_pm_zip > 50 & gwr_smk10 == 0, NA,
-                           rr)),
-         risk = rel_risk-1) 
+mod <- clogit(outcome ~ gwr_10unit + gwr_smk5 +
+          gwr_smk5*gwr_10unit  + wrf_temp_zip + 
+            strata(PATIENTID), data =cvd)
 
-ggplot(data = est_data, aes(x = geo_wt_pm_zip, y = risk, 
-                            color = as.factor(gwr_smk10))) +
-  geom_line() + 
-  theme_bw()
+# evidence for interaction
+mod_tidy <- broom::tidy(mod)
+mod
+mod$nevent
+# effect estimate of odds ratio table
+effect_table <- matrix(data = NA, nrow = 4, ncol = 5) %>% 
+  as_tibble() %>% 
+  rename(estimate = V1, 
+         odds_ratio = V2,
+         lower95 = V3,
+         upper95 = V4,
+         p_val = V5)
+
+effect_table[,1] <- c("pm_10unit", "smoke", "pm_diff","pm_smoke_10unit") 
+# populate table 
+effect_table[1,2:4] <- round(exp(mod_tidy[1, c(2,6:7)]),2) # OR and 95CI
+effect_table[1,5] <- round(mod_tidy[1,5],2) # pval
+effect_table[2,2:4] <- round(exp(mod_tidy[2, c(2,6:7)]),2) # OR and 95CI
+effect_table[2,5] <- round(mod_tidy[2,5],2) # pval
+# test for interaction
+effect_table[3,2:4] <- round(exp(mod_tidy[4, c(2,6:7)]),2) # OR and 95CI
+effect_table[3,5] <- round(mod_tidy[4,5],2) # pval
+
+# linear combination estimate for smoke pm2.5
+lin_combo <- c(1,0,0,1)
+# estimate 
+est <- as.numeric(t(lin_combo) %*% mod$coefficients)
+# std error
+se <- as.numeric(sqrt(t(lin_combo) %*% mod$var %*% lin_combo))
+# calculate bounds
+l95 <- est - (1.96*se)
+u95 <- est + (1.96*se)
+# calcuate z statistic and p val
+z <- est/se
+p <- 2*pnorm(-abs(z))
+# fill in table
+effect_table[4, 2:4] <- round(exp(c(est, l95, u95)),2)
+# p val
+effect_table[4,5] <- round(p,2)
+
+knitr::kable(effect_table, 
+  caption = paste0("CVD and PM2.5 effect modification estimates"))
 ```
+
+For CVD hospitalizations, there is no association with PM~2.5~ and the magnitude is in the opposite direction that what we'd expect. Our smoke term indicates a lower likelihood for risk of CVD hospitalization on a smoke day (may be people saying indoors). The interaction term (pm_dff) may suggest a difference in effect. However, when we look at the PM~2.5~ term on a smoke day, there is no association.
+
+## Power Simulations
+
+
+
+## Heart Failure
 
 ```{r hf association}
-mod <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk10 +
-        gwr_smk10*geo_wt_pm_zip +
-        wrf_temp_zip + strata(PATIENTID), data = hf)
+mod <- clogit(outcome ~ gwr_10unit + gwr_smk5 +
+          gwr_smk5*gwr_10unit  + wrf_temp_zip + 
+            strata(PATIENTID), data = hf)
 
-mod
-# new data set to fit clogit prediction model on
-est_data <- rep(seq(from = 0, to = 200, by = 10), 2) %>% 
+# evidence for interaction
+mod_tidy <- broom::tidy(mod)
+mod_tidy
+# effect estimate of odds ratio table
+effect_table <- matrix(data = NA, nrow = 4, ncol = 5) %>% 
   as_tibble() %>% 
-  rename(geo_wt_pm_zip = value) %>% 
-  group_by(geo_wt_pm_zip) %>% 
-  mutate(gwr_smk10 = c(0,1)) %>% 
-  ungroup() %>% 
-  mutate(PATIENTID= 226,
-         wrf_temp_zip = 294) %>% 
-  mutate(rr = predict(mod, newdata=., type = "risk"),
-         rel_risk = ifelse(geo_wt_pm_zip < 50 & gwr_smk10 == 0, rr, 
-                    ifelse(geo_wt_pm_zip > 50 & gwr_smk10 == 0, NA,
-                           rr)),
-         risk = rel_risk-1) 
+  rename(estimate = V1, 
+         odds_ratio = V2,
+         lower95 = V3,
+         upper95 = V4,
+         p_val = V5)
 
-ggplot(data = est_data, aes(x = geo_wt_pm_zip, y = risk, color = as.factor(gwr_smk10))) +
-  geom_line() + 
-  theme_bw()
+effect_table[,1] <- c("pm_10unit", "smoke", "pm_diff","pm_smoke_10unit") 
+# populate table 
+effect_table[1,2:4] <- round(exp(mod_tidy[1, c(2,6:7)]),2) # OR and 95CI
+effect_table[1,5] <- round(mod_tidy[1,5],2) # pval
+effect_table[2,2:4] <- round(exp(mod_tidy[2, c(2,6:7)]),2) # OR and 95CI
+effect_table[2,5] <- round(mod_tidy[2,5],2) # pval
+# test for interaction
+effect_table[3,2:4] <- round(exp(mod_tidy[4, c(2,6:7)]),2) # OR and 95CI
+effect_table[3,5] <- round(mod_tidy[4,5],2) # pval
+
+# linear combination estimate for smoke pm2.5
+lin_combo <- c(1,0,0,1)
+# estimate 
+est <- as.numeric(t(lin_combo) %*% mod$coefficients)
+# std error
+se <- as.numeric(sqrt(t(lin_combo) %*% mod$var %*% lin_combo))
+# calculate bounds
+l95 <- est - (1.96*se)
+u95 <- est + (1.96*se)
+# calcuate z statistic and p val
+z <- est/se
+p <- 2*pnorm(-abs(z))
+# fill in table
+effect_table[4, 2:4] <- round(exp(c(est, l95, u95)),2)
+# p val
+effect_table[4,5] <- round(p,2)
+
+knitr::kable(effect_table, 
+  caption = paste0("Heart failure and PM2.5 effect modification estimates"))
 ```
+
+For heart failure, we do see an increase in risk for hospitalization with a 10 ug/m^3 increase and on smoke days. The test for difference may suggest a difference in effect, where increases in PM~2.5~ on a smoke day is not associated with heart failure. Some interpretations of this may be that the initial risk is just the smoke itself, with increases in concentrations at this point having no effect. This would be probably the most interesting interaction to evaluate in the large study.
+
+## Myocardial Infarction
 
 ```{r mi association}
-mod <- clogit(outcome ~ geo_wt_pm_zip + gwr_smk10 +
-        gwr_smk10*geo_wt_pm_zip +
-        wrf_temp_zip + strata(PATIENTID), data = mi)
-mod
-# new data set to fit clogit prediction model on
-est_data <- rep(seq(from = 0, to = 200, by = 10), 2) %>% 
+mod <- clogit(outcome ~ gwr_10unit + gwr_smk5 +
+          gwr_smk5*gwr_10unit  + wrf_temp_zip + 
+            strata(PATIENTID), data = mi)
+
+# evidence for interaction
+mod_tidy <- broom::tidy(mod)
+mod_tidy
+# effect estimate of odds ratio table
+effect_table <- matrix(data = NA, nrow = 4, ncol = 5) %>% 
   as_tibble() %>% 
-  rename(geo_wt_pm_zip = value) %>% 
-  group_by(geo_wt_pm_zip) %>% 
-  mutate(gwr_smk10 = c(0,1)) %>% 
-  ungroup() %>% 
-  mutate(PATIENTID= 2598,
-         wrf_temp_zip = 294) %>% 
-  mutate(rr = predict(mod, newdata=., type = "risk"),
-         rel_risk = ifelse(geo_wt_pm_zip < 50 & gwr_smk10 == 0, rr, 
-                    ifelse(geo_wt_pm_zip > 50 & gwr_smk10 == 0, NA,
-                           rr)),
-         risk = rel_risk-1) 
+  rename(estimate = V1, 
+         odds_ratio = V2,
+         lower95 = V3,
+         upper95 = V4,
+         p_val = V5)
 
+effect_table[,1] <- c("pm_10unit", "smoke", "pm_diff","pm_smoke_10unit") 
+# populate table 
+effect_table[1,2:4] <- round(exp(mod_tidy[1, c(2,6:7)]),2) # OR and 95CI
+effect_table[1,5] <- round(mod_tidy[1,5],2) # pval
+effect_table[2,2:4] <- round(exp(mod_tidy[2, c(2,6:7)]),2) # OR and 95CI
+effect_table[2,5] <- round(mod_tidy[2,5],2) # pval
+# test for interaction
+effect_table[3,2:4] <- round(exp(mod_tidy[4, c(2,6:7)]),2) # OR and 95CI
+effect_table[3,5] <- round(mod_tidy[4,5],2) # pval
 
-ggplot(data = est_data, aes(x = geo_wt_pm_zip, y = risk, 
-                            color = as.factor(gwr_smk10))) +
-  geom_line() +
-  theme_bw()
+# linear combination estimate for smoke pm2.5
+lin_combo <- c(1,0,0,1)
+# estimate 
+est <- as.numeric(t(lin_combo) %*% mod$coefficients)
+# std error
+se <- as.numeric(sqrt(t(lin_combo) %*% mod$var %*% lin_combo))
+# calculate bounds
+l95 <- est - (1.96*se)
+u95 <- est + (1.96*se)
+# calcuate z statistic and p val
+z <- est/se
+p <- 2*pnorm(-abs(z))
+# fill in table
+effect_table[4, 2:4] <- round(exp(c(est, l95, u95)),2)
+# p val
+effect_table[4,5] <- round(p,2)
+
+knitr::kable(effect_table, 
+  caption = paste0("Myocardial infarction and PM2.5 effect modification estimates"))
 ```
 
-
+No evidence of association for either main term, but difference may indicate a difference in effect for PM~2.5~ on a smoke day. OR suggests that a 10 ug/m^3 increase on a smoke day is associated with a 3% increase in MI hospitalization, although not significant. Could very well be a power issue.
