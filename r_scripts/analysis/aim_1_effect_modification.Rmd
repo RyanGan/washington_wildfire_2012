@@ -109,23 +109,24 @@ cov_matrix <- mod$var
 mod_tidy <- broom::tidy(mod)
 
 # effect estimate of odds ratio table
-effect_table <- matrix(data = NA, nrow = 4, ncol = 5) %>% 
+asthma_table <- matrix(data = NA, nrow = 4, ncol = 5) %>% 
   as_tibble() %>% 
   rename(estimate = V1, 
          odds_ratio = V2,
          lower95 = V3,
          upper95 = V4,
-         p_val = V5)
+         p_val = V5) %>% 
+  mutate(outcome = "Asthma")
 
-effect_table[,1] <- c("pm_10unit", "smoke", "pm_diff","pm_smoke_10unit") 
+asthma_table[,1] <- c("pm_10unit", "smoke", "pm_diff","pm_smoke_10unit") 
 # populate table 
-effect_table[1,2:4] <- round(exp(mod_tidy[1, c(2,6:7)]),2) # OR and 95CI
-effect_table[1,5] <- round(mod_tidy[1,5],2) # pval
-effect_table[2,2:4] <- round(exp(mod_tidy[2, c(2,6:7)]),2) # OR and 95CI
-effect_table[2,5] <- round(mod_tidy[2,5],2) # pval
+asthma_table[1,2:4] <- round(exp(mod_tidy[1, c(2,6:7)]),2) # OR and 95CI
+asthma_table[1,5] <- round(mod_tidy[1,5],2) # pval
+asthma_table[2,2:4] <- round(exp(mod_tidy[2, c(2,6:7)]),2) # OR and 95CI
+asthma_table[2,5] <- round(mod_tidy[2,5],2) # pval
 # test for interaction
-effect_table[3,2:4] <- round(exp(mod_tidy[4, c(2,6:7)]),2) # OR and 95CI
-effect_table[3,5] <- round(mod_tidy[4,5],2) # pval
+asthma_table[3,2:4] <- round(exp(mod_tidy[4, c(2,6:7)]),2) # OR and 95CI
+asthma_table[3,5] <- round(mod_tidy[4,5],2) # pval
 
 # linear combination estimate for smoke pm2.5
 lin_combo <- c(1,0,0,1)
@@ -140,11 +141,11 @@ u95 <- est + (1.96*se)
 z <- est/se
 p <- 2*pnorm(-abs(z))
 # fill in table
-effect_table[4, 2:4] <- round(exp(c(est, l95, u95)),2)
+asthma_table[4, 2:4] <- round(exp(c(est, l95, u95)),2)
 # p val
-effect_table[4,5] <- round(p,2)
+asthma_table[4,5] <- round(p,2)
 
-knitr::kable(effect_table, 
+knitr::kable(asthma_table, 
   caption = paste0("Asthma and PM2.5 effect modification estimates"))
 ```
 
@@ -154,15 +155,67 @@ Our indicator of a smoke day indicates that the risk for an asthma event on a sm
 
 The PM~2.5~ response on a smoke day indicates that a 10 ug/m^3 increase in PM~2.5~ increases risk for asthma by 7% and that this is a significant. This is the same magnitude of response we found in our Washington study when we subtracted off the baseline level.
 
-```{r asthma power}
+```{r asthma power, eval = F}
 n <- 1500
 # assuming roughly 8% of smoke days
-sim_data <- as_tibble(rbinom(n, 1, prob = 0.08)) %>% 
-  rename(gwr_smk5)
-mean(sim_data$value)
-mean(pm$gwr_smk5)
-mean(pm$geo_wt_pm)
-sd(pm$geo_wt_pm)
+sim_data <- as_tibble(rbinom(n, 1, prob = 0.15)) %>% 
+  rename(gwr_smk5 = value) %>%
+  # simulate pm value without smoke and with smoke
+  mutate(gwr_pm = ifelse(gwr_smk5 == 0, rnorm(n, mean = 5.7, sd = 2.3),
+    rnorm(n, mean = 20.2, sd = 16.7)),
+  # simulate logit response
+  outcome = rbinom(n, 1, 1/(1+exp(-(-0.5 + 0.095*gwr_pm + 0.23*gwr_smk5 - 
+            0.025*gwr_smk5*gwr_pm))))) 
+
+sim_mod <- glm(outcome ~ gwr_pm + gwr_smk5 + gwr_pm*gwr_smk5, 
+               family = "binomial", data = sim_data)
+
+summary(sim_mod)
+mod
+summary(sim_data)
+
+pm_sim_vals <- pm %>% 
+  group_by(gwr_smk5) %>% 
+  summarise(pm_mean = mean(geo_wt_pm), pm_sd = sd(geo_wt_pm))
+pm_sim_vals
+```
+
+```{r std pwr}
+# assuming base proportion of asthma is 0.06
+0.06*.975-0.06
+exp(-0.02523)
+
+pr_exp <- prop.table(xtabs(~outcome + gwr_smk5, asthma),2)[2,]
+pr_exp
+# ratio
+pr_exp[2]/pr_exp[1]  
+# diff
+pr_exp[2] - pr_exp[1]
+
+test_mod <- clogit(outcome ~ gwr_smk5 +
+            strata(PATIENTID), data =asthma)
+test_mod
+mod
+# diff in probability
+(1/exp(1+(-0.09))) - 1/exp(1+(0.025))
+# vector of effect size
+effect_size <- rep(seq(from=0.01,to=0.06, by=0.01),25)
+# vector of sample sizes to estimate
+case_size <- rep(seq(from = 1000, to = 25000, by = 1000) ,6)
+
+power_df <- as_data_frame(cbind(effect_size, case_size))
+
+  # apply function to calculate power
+power_df$power <- apply(power_df, 1, function(x){
+  pwr <- pwr::pwr.2p2n.test(h=x[1], n1=x[2], n2=x[2]*20, 
+    sig.level=0.05, alternative = "two.sided")
+  return(pwr$power)
+  })
+
+ggplot(data = power_df, aes(x = case_size, y = power, 
+  colour = as.factor(effect_size))) +
+  geom_line() +
+  theme_bw()
 ```
 
 ## All CVD
@@ -177,23 +230,24 @@ mod_tidy <- broom::tidy(mod)
 mod
 mod$nevent
 # effect estimate of odds ratio table
-effect_table <- matrix(data = NA, nrow = 4, ncol = 5) %>% 
+cvd_table <- matrix(data = NA, nrow = 4, ncol = 5) %>% 
   as_tibble() %>% 
   rename(estimate = V1, 
          odds_ratio = V2,
          lower95 = V3,
          upper95 = V4,
-         p_val = V5)
+         p_val = V5) %>% 
+  mutate(outcome = "CVD")
 
-effect_table[,1] <- c("pm_10unit", "smoke", "pm_diff","pm_smoke_10unit") 
+cvd_table[,1] <- c("pm_10unit", "smoke", "pm_diff","pm_smoke_10unit") 
 # populate table 
-effect_table[1,2:4] <- round(exp(mod_tidy[1, c(2,6:7)]),2) # OR and 95CI
-effect_table[1,5] <- round(mod_tidy[1,5],2) # pval
-effect_table[2,2:4] <- round(exp(mod_tidy[2, c(2,6:7)]),2) # OR and 95CI
-effect_table[2,5] <- round(mod_tidy[2,5],2) # pval
+cvd_table[1,2:4] <- round(exp(mod_tidy[1, c(2,6:7)]),2) # OR and 95CI
+cvd_table[1,5] <- round(mod_tidy[1,5],2) # pval
+cvd_table[2,2:4] <- round(exp(mod_tidy[2, c(2,6:7)]),2) # OR and 95CI
+cvd_table[2,5] <- round(mod_tidy[2,5],2) # pval
 # test for interaction
-effect_table[3,2:4] <- round(exp(mod_tidy[4, c(2,6:7)]),2) # OR and 95CI
-effect_table[3,5] <- round(mod_tidy[4,5],2) # pval
+cvd_table[3,2:4] <- round(exp(mod_tidy[4, c(2,6:7)]),2) # OR and 95CI
+cvd_table[3,5] <- round(mod_tidy[4,5],2) # pval
 
 # linear combination estimate for smoke pm2.5
 lin_combo <- c(1,0,0,1)
@@ -208,19 +262,15 @@ u95 <- est + (1.96*se)
 z <- est/se
 p <- 2*pnorm(-abs(z))
 # fill in table
-effect_table[4, 2:4] <- round(exp(c(est, l95, u95)),2)
+cvd_table[4, 2:4] <- round(exp(c(est, l95, u95)),2)
 # p val
-effect_table[4,5] <- round(p,2)
+cvd_table[4,5] <- round(p,2)
 
-knitr::kable(effect_table, 
+knitr::kable(cvd_table, 
   caption = paste0("CVD and PM2.5 effect modification estimates"))
 ```
 
 For CVD hospitalizations, there is no association with PM~2.5~ and the magnitude is in the opposite direction that what we'd expect. Our smoke term indicates a lower likelihood for risk of CVD hospitalization on a smoke day (may be people saying indoors). The interaction term (pm_dff) may suggest a difference in effect. However, when we look at the PM~2.5~ term on a smoke day, there is no association.
-
-## Power Simulations
-
-
 
 ## Heart Failure
 
@@ -233,23 +283,24 @@ mod <- clogit(outcome ~ gwr_10unit + gwr_smk5 +
 mod_tidy <- broom::tidy(mod)
 mod_tidy
 # effect estimate of odds ratio table
-effect_table <- matrix(data = NA, nrow = 4, ncol = 5) %>% 
+hf_table <- matrix(data = NA, nrow = 4, ncol = 5) %>% 
   as_tibble() %>% 
   rename(estimate = V1, 
          odds_ratio = V2,
          lower95 = V3,
          upper95 = V4,
-         p_val = V5)
+         p_val = V5) %>% 
+  mutate(outcome = "Heart Failure")
 
-effect_table[,1] <- c("pm_10unit", "smoke", "pm_diff","pm_smoke_10unit") 
+hf_table[,1] <- c("pm_10unit", "smoke", "pm_diff","pm_smoke_10unit") 
 # populate table 
-effect_table[1,2:4] <- round(exp(mod_tidy[1, c(2,6:7)]),2) # OR and 95CI
-effect_table[1,5] <- round(mod_tidy[1,5],2) # pval
-effect_table[2,2:4] <- round(exp(mod_tidy[2, c(2,6:7)]),2) # OR and 95CI
-effect_table[2,5] <- round(mod_tidy[2,5],2) # pval
+hf_table[1,2:4] <- round(exp(mod_tidy[1, c(2,6:7)]),2) # OR and 95CI
+hf_table[1,5] <- round(mod_tidy[1,5],2) # pval
+hf_table[2,2:4] <- round(exp(mod_tidy[2, c(2,6:7)]),2) # OR and 95CI
+hf_table[2,5] <- round(mod_tidy[2,5],2) # pval
 # test for interaction
-effect_table[3,2:4] <- round(exp(mod_tidy[4, c(2,6:7)]),2) # OR and 95CI
-effect_table[3,5] <- round(mod_tidy[4,5],2) # pval
+hf_table[3,2:4] <- round(exp(mod_tidy[4, c(2,6:7)]),2) # OR and 95CI
+hf_table[3,5] <- round(mod_tidy[4,5],2) # pval
 
 # linear combination estimate for smoke pm2.5
 lin_combo <- c(1,0,0,1)
@@ -264,11 +315,11 @@ u95 <- est + (1.96*se)
 z <- est/se
 p <- 2*pnorm(-abs(z))
 # fill in table
-effect_table[4, 2:4] <- round(exp(c(est, l95, u95)),2)
+hf_table[4, 2:4] <- round(exp(c(est, l95, u95)),2)
 # p val
-effect_table[4,5] <- round(p,2)
+hf_table[4,5] <- round(p,2)
 
-knitr::kable(effect_table, 
+knitr::kable(hf_table, 
   caption = paste0("Heart failure and PM2.5 effect modification estimates"))
 ```
 
@@ -285,23 +336,24 @@ mod <- clogit(outcome ~ gwr_10unit + gwr_smk5 +
 mod_tidy <- broom::tidy(mod)
 mod_tidy
 # effect estimate of odds ratio table
-effect_table <- matrix(data = NA, nrow = 4, ncol = 5) %>% 
+mi_table <- matrix(data = NA, nrow = 4, ncol = 5) %>% 
   as_tibble() %>% 
   rename(estimate = V1, 
          odds_ratio = V2,
          lower95 = V3,
          upper95 = V4,
-         p_val = V5)
+         p_val = V5) %>% 
+  mutate(outcome = "Myocardial Infarction")
 
-effect_table[,1] <- c("pm_10unit", "smoke", "pm_diff","pm_smoke_10unit") 
+mi_table[,1] <- c("pm_10unit", "smoke", "pm_diff","pm_smoke_10unit") 
 # populate table 
-effect_table[1,2:4] <- round(exp(mod_tidy[1, c(2,6:7)]),2) # OR and 95CI
-effect_table[1,5] <- round(mod_tidy[1,5],2) # pval
-effect_table[2,2:4] <- round(exp(mod_tidy[2, c(2,6:7)]),2) # OR and 95CI
-effect_table[2,5] <- round(mod_tidy[2,5],2) # pval
+mi_table[1,2:4] <- round(exp(mod_tidy[1, c(2,6:7)]),2) # OR and 95CI
+mi_table[1,5] <- round(mod_tidy[1,5],2) # pval
+mi_table[2,2:4] <- round(exp(mod_tidy[2, c(2,6:7)]),2) # OR and 95CI
+mi_table[2,5] <- round(mod_tidy[2,5],2) # pval
 # test for interaction
-effect_table[3,2:4] <- round(exp(mod_tidy[4, c(2,6:7)]),2) # OR and 95CI
-effect_table[3,5] <- round(mod_tidy[4,5],2) # pval
+mi_table[3,2:4] <- round(exp(mod_tidy[4, c(2,6:7)]),2) # OR and 95CI
+mi_table[3,5] <- round(mod_tidy[4,5],2) # pval
 
 # linear combination estimate for smoke pm2.5
 lin_combo <- c(1,0,0,1)
@@ -316,12 +368,57 @@ u95 <- est + (1.96*se)
 z <- est/se
 p <- 2*pnorm(-abs(z))
 # fill in table
-effect_table[4, 2:4] <- round(exp(c(est, l95, u95)),2)
+mi_table[4, 2:4] <- round(exp(c(est, l95, u95)),2)
 # p val
-effect_table[4,5] <- round(p,2)
+mi_table[4,5] <- round(p,2)
 
-knitr::kable(effect_table, 
+knitr::kable(mi_table, 
   caption = paste0("Myocardial infarction and PM2.5 effect modification estimates"))
 ```
 
 No evidence of association for either main term, but difference may indicate a difference in effect for PM~2.5~ on a smoke day. OR suggests that a 10 ug/m^3 increase on a smoke day is associated with a 3% increase in MI hospitalization, although not significant. Could very well be a power issue.
+
+Figure of pilot data for grant.
+
+```{r pilot plot}
+small_multiples_df <- rbind(asthma_table, cvd_table, hf_table, mi_table)
+
+interaction_p <- small_multiples_df %>%  filter(estimate == "pm_diff") %>% 
+  select(outcome, p_val) %>% 
+  rename(p_int = p_val)
+
+or_df <- small_multiples_df %>% 
+  filter(estimate == c("pm_10unit", "pm_smoke_10unit")) %>% 
+  right_join(interaction_p, by = "outcome") %>% 
+  mutate(outcome_p = paste0(outcome, "\n Interaction p-value = ",p_int))
+
+or_plot <- ggplot(data = or_df, 
+  aes(x = estimate, y = odds_ratio, colour = estimate)) +
+  scale_color_manual(name = expression(paste("PM"[2.5], " Group")),
+                     values = c("blue", "red"),
+                     labels = c("Anthropogenic", "Wildfire")) +
+  geom_point() +
+  geom_errorbar(aes(ymin=lower95, ymax=upper95), width = 0.2) +
+  geom_hline(yintercept = 1, linetype = 2) +
+  ylab(expression(paste("Odds Ratio for 10 µg/m"^3, " Increase in PM"[2.5]))) +
+  facet_wrap(~outcome_p, scales = "free") +
+   # plot theme
+    theme(panel.background = element_rect(fill = 'white', colour = 'black'),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    # strip element
+    strip.background = element_rect(colour=NA, fill=NA),
+    panel.border = element_rect(fill = NA, color = "black"),
+    # facet text size
+    #strip.text = element_text(size = 8),
+    # axis element
+    axis.text.x = element_blank(),
+    axis.title.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.title.y = element_text(angle = 90),
+    # legend elements
+    legend.position = "bottom")
+    #legend.text = element_text(size = 8))
+
+or_plot
+```
