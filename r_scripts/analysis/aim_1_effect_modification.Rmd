@@ -14,14 +14,13 @@ Things I want to do: check distribution, try out a couple interaction models in 
 ```{r libraries}
 library(tidyverse)
 library(survival) 
-library(contrast)
 ```
 
 Importing a couple of case-crossover datasets.
 
 ```{r import data, echo=F, message=F, warning=F}
-path <- "../.."
-#path <- "."
+#path <- "../.."
+path <- "."
 # pm2.5 estimates
 pm <- read_csv(paste0(path,"/data/pm_data/zip_pm_to_merge_with_chars.csv")) %>% 
   na.omit() %>% 
@@ -31,7 +30,7 @@ pm <- read_csv(paste0(path,"/data/pm_data/zip_pm_to_merge_with_chars.csv")) %>%
          gwr_smk10 = ifelse(geo_smk_pm > 10, 1, 0),
          gwr_smk15 = ifelse(geo_smk_pm > 15, 1, 0),
          gwr_smk20 = ifelse(geo_smk_pm > 20, 1, 0),
-         gwr_10unit = geo_wt_pm_zip/10)
+         gwr_10unit = geo_wt_pm/10)
 
 # all cvd
 cvd <- read_csv(paste0(path,"/data/health_data/",
@@ -215,7 +214,11 @@ power_df$power <- apply(power_df, 1, function(x){
 ggplot(data = power_df, aes(x = case_size, y = power, 
   colour = as.factor(effect_size))) +
   geom_line() +
+  guides(colour=guide_legend("Effect Size")) +
+  ylab("Power") +
+  xlab("Case Size") +
   theme_bw()
+
 ```
 
 ## All CVD
@@ -229,6 +232,11 @@ mod <- clogit(outcome ~ gwr_10unit + gwr_smk5 +
 mod_tidy <- broom::tidy(mod)
 mod
 mod$nevent
+# cvd events on a smoke day
+cvd_smoke <- cvd %>% 
+  group_by(gwr_smk5) %>% 
+  summarise(n_case = sum(outcome))
+cvd_smoke
 # effect estimate of odds ratio table
 cvd_table <- matrix(data = NA, nrow = 4, ncol = 5) %>% 
   as_tibble() %>% 
