@@ -24,4 +24,6 @@ data/
 *.shp
 *.shx
 
+# ignore jupyter notebook checkpoints
+*.ipynb_checkpoints/
 select_zip_exposure_time_series.html
