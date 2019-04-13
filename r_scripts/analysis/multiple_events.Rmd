@@ -1,0 +1,67 @@
+---
+title: "Number of Cases with Multiple Events"
+author: "Ryan Gan"
+date: "4/12/2019"
+output: html_document
+---
+
+## Purpose
+
+This document is in response to an inquery by Washington State health officials. They would like to know the numer of persons with multiple events for each outcome evaluated to judge the impact of our decision to include only the first event per subject.
+
+```{r library}
+library(tidyverse)
+```
+
+Reading in CHARS data.
+
+```{r read_chars}
+read_chars <- paste0('../../data/health_data/',
+                     'chars_2012_confidential.csv')
+# read in chars cleaned data
+chars_2012_conf_df <- read_csv(read_chars, col_types = cols(.default = "c"))
+```
+
+Limiting 2012 data to study period of 2012-07-01 to 2012-10-31 and counting up the number of hospitalization visits admitted through the ER with a primary diagnosis of the outcome of interest for each person.
+
+```{r count_of_outcome_visits}
+chars_n <- chars_2012_conf_df %>% 
+  mutate(admit_date_impute = as.Date(admit_date_impute, 
+                                     format = '%Y-%m-%d')) %>% 
+  # change dx to numeric
+  mutate_at(vars(resp1:ra_dx), funs(as.numeric)) %>% 
+  # filter to July 1st to Oct 31st
+  filter(admit_date_impute >= "2012-07-01" & 
+           admit_date_impute  <= "2012-10-31") %>% 
+  group_by(PATIENTID) %>% 
+  summarize(n = n(), resp_n = sum(resp1), asthma_n = sum(asthma1),
+            copd_n = sum(copd1), pneum_n = sum(pneum1), 
+            acute_bronch_n = sum(acute_bronch1), cvd_n = sum(cvd1),
+            ihd_n = sum(ihd1), arrhythmia_n = sum(arrhythmia1), 
+            hf_n = sum(hf1), cereb_vas_n = sum(cereb_vas1), mi_n = sum(mi1),
+            broken_arm_n = sum(broken_arm1)) 
+```
+
+Defining a function to count up the percent of multiple visits for each outcome and applying it to the patient counts dataframe. Final result is a table of the number of patients with multiple events, over the number of patients with at least one event, and the proportion of persons with multiple events.
+
+```{r multi_vis_count_table}
+# function
+multi_vis_fun <- function(x){
+  n_multi_vis <- sum(ifelse(x > 1, 1, 0))
+  n_cases <- sum(x == 1)
+  pr_multi_vis <- round((n_multi_vis/n_cases)*100,1)
+  rbind(n_multi_vis, n_cases, pr_multi_vis)
+}
+# apply function
+visit_count <- apply(chars_n[,-(c(1,2))], 2, multi_vis_fun)
+
+description <- c('Multiple Visits (n)', 'Patients with event (n)', 
+                 'Percent with multiple events')
+# final table
+knitr::kable(data.frame(cbind(description, visit_count)))
+```
+
+
+## Summary/Conclusion
+
+In our Washington 2012 paper, we evaluated only the first hosptial visit as an event in the time-stratified case-crossover design.There are some outcomes like asthma where the number of secondary events are relatively infrequent (6%), but can get as high as 13% in CVD. As another note, these numbers are not exactly in line with the manuscript numbers as I lose persons who I'm not able to assign a PM2.5 value to. 
